@@ -20,8 +20,17 @@ broker). In this game, this is your income.
 stored their fuel in. Bunker costs are usually the biggest single voyage
 expense.
 
+**Capesize**: The largest common dry bulk carriers, roughly 150,000–210,000
+DWT, mostly carrying iron ore and coal. Too big for the Panama Canal (and
+historically the old Suez Canal), so they sail around Cape Horn and the Cape
+of Good Hope, hence the name.
+
 **Charterer**: The party who hires a ship. In dry bulk this is usually the
 cargo owner, or a trader shipping cargo on someone else's behalf.
+
+**Chokepoint**: A narrow passage that many shipping routes must pass through,
+such as the Strait of Malacca, Suez Canal or Panama Canal. A closure or queue
+at one can add days or weeks to voyages.
 
 **Deadweight (DWT)**: The total weight in tonnes a ship can carry: cargo plus
 fuel, fresh water, stores and crew. Because fuel and stores take up some of
@@ -30,6 +39,9 @@ it, the cargo a ship can actually lift is always a bit less than its DWT.
 **Demurrage**: Money the charterer pays the owner when loading or discharging
 takes longer than the time allowed in the contract. It compensates the owner
 for the ship being stuck in port.
+
+**Discharge port**: The port where the cargo is unloaded at the end of the
+laden leg.
 
 **Draft (draught)**: How deep a ship sits in the water. A loaded ship sits
 deeper, so a shallow port or channel can stop a ship from loading fully.
@@ -46,12 +58,21 @@ dry bulk it is usually quoted in US dollars per tonne of cargo.
 **Laden leg**: The part of a voyage where the ship is carrying cargo, from the
 load port to the discharge port.
 
+**Load port**: The port where the cargo is loaded onto the ship.
+
 **Nautical mile (nm)**: The distance unit used at sea, equal to 1,852 metres
 (about 1.15 ordinary miles).
+
+**Open position**: Where and when a ship becomes free for its next job,
+usually the port where it finishes discharging its current cargo. Brokers
+circulate lists of open ships to charterers.
 
 **Opex (operating expenses)**: What it costs every day just to own and run the
 ship, whether or not it is working: crew wages, insurance, maintenance,
 spares, stores. Opex is not a voyage cost.
+
+**Panamax**: A dry bulk carrier of roughly 65,000–85,000 DWT, originally the
+largest size that fit the old Panama Canal locks.
 
 **Port costs (port disbursements)**: Fees paid at each port call: harbour
 dues, pilots, tugs, berth fees, agency fees. On a voyage charter the shipowner
