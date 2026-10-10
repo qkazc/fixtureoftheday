@@ -22,6 +22,7 @@ const coal: CargoOrder = {
 };
 const market: DailyMarket = {
   date: '2026-10-10',
+  seed: 'test',
   bunkerPriceUsdPerTonne: 600,
   cargoes: [coal],
   ships: [

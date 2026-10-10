@@ -7,8 +7,8 @@
 
 import { CLASS_NAMES, COMMODITY_NAMES, REGIONS, calendarDay, contestPair, type Inbox } from './inbox';
 import {
+  bunkerPrice,
   chartererCeilingShare,
-  generateMarket,
   ownerFloorShare,
   rateForTce,
   TRADES,
@@ -61,8 +61,8 @@ function indicativeRate(trade: Trade, bunkerPriceUsdPerTonne: number): number {
 
 export function generateBriefing(inbox: Inbox): Briefing {
   const { market, date } = inbox;
-  const yesterday = generateMarket(previousDate(date));
-  const bunkerChange = market.bunkerPriceUsdPerTonne - yesterday.bunkerPriceUsdPerTonne;
+  const yesterdayBunkers = bunkerPrice(previousDate(date));
+  const bunkerChange = market.bunkerPriceUsdPerTonne - yesterdayBunkers;
   const ownerOf = (shipId: string) =>
     inbox.emails.find((e) => e.kind === 'positionList' && e.shipIds.includes(shipId))?.from ?? 'Owners';
   const chartererOf = (cargoId: string) =>
@@ -103,7 +103,7 @@ export function generateBriefing(inbox: Inbox): Briefing {
           : `Bunkers $${market.bunkerPriceUsdPerTonne}/t, ${bunkerChange > 0 ? 'up' : 'down'} $${Math.abs(bunkerChange)} overnight.`,
     },
   ];
-  const rng = createRng(hashSeed(`${date}|brief`));
+  const rng = createRng(hashSeed(`${market.seed}|brief`));
   const news = [contest, ...shuffle(rng, optional).slice(0, randomInt(rng, 2, 3))];
 
   return {
@@ -113,7 +113,7 @@ export function generateBriefing(inbox: Inbox): Briefing {
     news,
     routeRates: TRADES.map((trade) => {
       const rate = indicativeRate(trade, market.bunkerPriceUsdPerTonne);
-      return { trade, rateUsdPerTonne: rate, changeUsdPerTonne: rate - indicativeRate(trade, yesterday.bunkerPriceUsdPerTonne) };
+      return { trade, rateUsdPerTonne: rate, changeUsdPerTonne: rate - indicativeRate(trade, yesterdayBunkers) };
     }),
     positions: [...market.ships].sort((x, y) => x.openDay - y.openDay),
   };

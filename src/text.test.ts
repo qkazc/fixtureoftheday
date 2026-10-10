@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { generateInbox, summarizeDay, endDay, startDay, attemptFix, isWorkable, negotiationLimits, research, type EnquiryEmail } from '../engine';
+import { generateInbox, summarizeDay, endDay, startDay, attemptFix, isWorkable, negotiationLimits, research, solveDay, type BestDay, type EnquiryEmail, type Inbox } from '../engine';
 import {
+  bestPlanText,
   blockMessage,
+  cargoLabel,
   clockLabel,
   deadlineLabel,
   endOfDayText,
   fixOutcomeMessage,
   fixtureReasonText,
   hoursLabel,
+  parPercent,
   roughUsd,
   skippedText,
 } from './text';
@@ -75,27 +78,45 @@ describe('endOfDayText', () => {
   });
 
   it('explains an early end: the time, and why each enquiry was out of reach', () => {
-    // 10 Oct: fix the Santos-Qingdao grain, then research Santos-Rotterdam at 13:00.
-    // Research takes it to 13:30, too late for a 2 h fix due by 15:00, and the day ends.
-    const enquiry = (to: string) =>
-      inbox.emails.find((e): e is EnquiryEmail => e.kind === 'enquiry' && cargoOf(e.cargoId).loadPort === 'santos' && cargoOf(e.cargoId).dischargePort === to)!;
-    const qingdao = enquiry('qingdao');
-    const rotterdam = enquiry('rotterdam');
-    const coal = inbox.emails.find((e): e is EnquiryEmail => e.kind === 'enquiry' && cargoOf(e.cargoId).commodity === 'coal')!;
-    let s = startDay();
-    // Use up the morning on the coal enquiry with a lowball (refused, costs 1 h), twice.
-    const coalShip = inbox.market.ships.find((sh) => isWorkable(inbox.market, sh, cargoOf(coal.cargoId)))!;
-    s = (attemptFix(inbox, s, coal.id, coalShip.id, 0.5) as { state: typeof s }).state;
-    s = (attemptFix(inbox, s, coal.id, coalShip.id, 0.5) as { state: typeof s }).state;
-    const qShip = inbox.market.ships.find((sh) => isWorkable(inbox.market, sh, cargoOf(qingdao.cargoId)))!;
-    const l = negotiationLimits(inbox.market, qShip, cargoOf(qingdao.cargoId));
-    s = (attemptFix(inbox, s, qingdao.id, qShip.id, (l.ownerFloorRate + l.chartererCeilingRate) / 2) as { state: typeof s }).state;
-    s = { ...s, clockHour: 13 };
-    const r = research(inbox, s, rotterdam.id);
+    // Every enquiry due at 15:00. Research one at 14:00: that takes the clock
+    // to 14:30, too late for any fix (each takes at least 1 h), so the day ends.
+    const due15: Inbox = { ...inbox, emails: inbox.emails.map((e) => (e.kind === 'enquiry' ? { ...e, deadlineHour: 15 } : e)) };
+    const enquiries = due15.emails.filter((e): e is EnquiryEmail => e.kind === 'enquiry');
+    const r = research(due15, { ...startDay(), clockHour: 14 }, enquiries[0]!.id);
     expect(r.ok && r.state.ended).toBe(true);
-    const lines = endOfDayText(summarizeDay(inbox, r.state), cargoOf);
-    expect(lines[0]).toBe('Day ended at 13:30 with 3.5 h left: nothing more you could act on.');
-    expect(lines).toContain('69,000 t grain, Santos to Rotterdam: needed 2 h, but its deadline was 15:00.');
+    const lines = endOfDayText(summarizeDay(due15, r.state), cargoOf);
+    expect(lines[0]).toBe('Day ended at 14:30 with 2.5 h left: nothing more you could act on.');
+    for (const e of enquiries) {
+      const why = 14.5 + e.effortHours > 17 ? 'more than the time left' : 'but its deadline was 15:00';
+      expect(lines).toContain(`${cargoLabel(cargoOf(e.cargoId))}: needed ${e.effortHours} h, ${why}.`);
+    }
   });
 });
 
+
+describe('parPercent', () => {
+  it('rounds to a whole percentage and never passes 100', () => {
+    expect(parPercent(0, 1000)).toBe(0);
+    expect(parPercent(854, 1000)).toBe(85);
+    expect(parPercent(1000, 1000)).toBe(100);
+    expect(parPercent(1000.4, 1000)).toBe(100);
+    expect(parPercent(0, 0)).toBe(100);
+  });
+});
+
+describe('bestPlanText', () => {
+  const inbox = generateInbox('2026-10-10');
+
+  it('lists the best day as timed steps, one per fix', () => {
+    const best = solveDay(inbox);
+    const lines = bestPlanText(inbox, best);
+    expect(lines).toHaveLength(best.fixes.length + (best.handlesDistraction ? 1 : 0));
+    expect(lines[0]).toMatch(/^09:00 /);
+    for (const f of best.fixes) expect(lines.some((l) => l.includes(`at $${f.rateUsdPerTonne.toFixed(2)}/t.`))).toBe(true);
+  });
+
+  it('starts with the urgent parcel when the plan handles it', () => {
+    const best: BestDay = { score: 1, commissionUsd: 1, handlesDistraction: true, fixes: [] };
+    expect(bestPlanText(inbox, best)).toEqual(['09:00 Handle the urgent small parcel ($1,500).']);
+  });
+});

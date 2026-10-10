@@ -9,7 +9,7 @@ import {
   type EnquiryEmail,
   type Inbox,
 } from './inbox';
-import { isWorkable } from './market';
+import { GENERATOR_VERSION, isWorkable } from './market';
 
 const DATES = Array.from({ length: 100 }, (_, i) =>
   new Date(Date.UTC(2026, 0, 1 + i * 4)).toISOString().slice(0, 10),
@@ -98,5 +98,13 @@ describe('calendarDay', () => {
   it('counts days from the inbox date, across month ends', () => {
     expect(calendarDay('2026-10-10', 0)).toBe('10 Oct');
     expect(calendarDay('2026-10-30', 3)).toBe('2 Nov');
+  });
+});
+
+describe('variants', () => {
+  it('puts the version and the variant into the seed', () => {
+    expect(generateInbox('2026-10-10').market.seed).toBe(`v${GENERATOR_VERSION}|2026-10-10|0`);
+    expect(generateInbox('2026-10-10', 1).market.seed).toBe(`v${GENERATOR_VERSION}|2026-10-10|1`);
+    expect(generateInbox('2026-10-10', 1)).not.toEqual(generateInbox('2026-10-10'));
   });
 });

@@ -113,10 +113,11 @@ export function approxCommission(cargo: CargoOrder): number {
   return Math.max(1000, Math.round(exact / 1000) * 1000);
 }
 
-export function generateInbox(date: string): Inbox {
-  const market = generateMarket(date);
+/** The day's inbox. `variant` re-rolls the day (see engine/daily.ts). */
+export function generateInbox(date: string, variant = 0): Inbox {
+  const market = generateMarket(date, variant);
   // A separate random stream, so the market itself is unchanged by the inbox.
-  const rng = createRng(hashSeed(`${date}|inbox`));
+  const rng = createRng(hashSeed(`${market.seed}|inbox`));
   const port = (id: PortId) => PORTS[id].name;
 
   const enquiries: Omit<EnquiryEmail, 'id'>[] = market.cargoes.map((c) => {

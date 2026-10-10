@@ -1,0 +1,44 @@
+// The shareable result line for a finished day. Spoiler-free: no ship
+// names or rates, so it doesn't give the day away to someone yet to play.
+
+import { calendarDay, type DaySummary, type EnquiryEmail, type Inbox } from '../engine';
+import { formatUsd } from './format';
+import { parPercent } from './text';
+
+/**
+ * One square per enquiry, soonest deadline first:
+ * 🟩 fixed with both sides at least content (50+), 🟨 fixed, ⬛ missed.
+ */
+export function resultSquares(inbox: Inbox, summary: DaySummary): string {
+  const enquiries = inbox.emails
+    .filter((e): e is EnquiryEmail => e.kind === 'enquiry')
+    .sort((a, b) => (a.deadlineHour ?? 24) - (b.deadlineHour ?? 24));
+  return enquiries
+    .map((e) => {
+      const f = summary.fixtures.find((x) => x.fixture.emailId === e.id);
+      if (!f) return '⬛';
+      return f.result.ownerSatisfaction >= 50 && f.result.chartererSatisfaction >= 50 ? '🟩' : '🟨';
+    })
+    .join('');
+}
+
+/**
+ * Where friends can play. Fixed rather than read from the browser, because
+ * the game also runs in places whose own address isn't shareable (the dev
+ * server, a preview page).
+ */
+export const PUBLIC_URL = 'https://qkazc.github.io/fixtureoftheday/';
+
+/** `bestScore` is the best possible day's score (see solveDay), for the percentage. */
+export function shareText(inbox: Inbox, summary: DaySummary, bestScore: number): string {
+  const enquiries = inbox.emails.filter((e) => e.kind === 'enquiry').length;
+  const pct = (v: number | null) => (v === null ? '–' : String(Math.round(v)));
+  return [
+    `Fixture of the Day · ${calendarDay(inbox.date, 0)} ${inbox.date.slice(0, 4)}`,
+    `⚓ ${summary.fixtures.length}/${enquiries} fixed · ${formatUsd(summary.totalCommissionUsd)} commission`,
+    `Score ${Math.round(summary.totalScore).toLocaleString('en-US')} · ${parPercent(summary.totalScore, bestScore)}% of the best possible`,
+    `Owners ${pct(summary.avgOwnerSatisfaction)} · Charterers ${pct(summary.avgChartererSatisfaction)}`,
+    resultSquares(inbox, summary),
+    PUBLIC_URL,
+  ].join('\n');
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateBriefing, previousDate } from './briefing';
 import { contestPair, generateInbox } from './inbox';
-import { chartererCeilingShare, generateMarket, ownerFloorShare, rateForTce, TRADES } from './market';
+import { bunkerPrice, chartererCeilingShare, ownerFloorShare, rateForTce, TRADES } from './market';
 import { VESSEL_CLASSES } from './vessels';
 
 const DATES = Array.from({ length: 100 }, (_, i) =>
@@ -50,7 +50,7 @@ describe('generateBriefing', () => {
             break;
           }
           case 'bunkers': {
-            const yesterday = generateMarket(previousDate(inbox.date)).bunkerPriceUsdPerTonne;
+            const yesterday = bunkerPrice(previousDate(inbox.date));
             expect(brief.bunkerChangeUsdPerTonne).toBe(market.bunkerPriceUsdPerTonne - yesterday);
             expect(n.text).toContain(`$${market.bunkerPriceUsdPerTonne}/t`);
             break;

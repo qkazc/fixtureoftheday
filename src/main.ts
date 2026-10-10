@@ -1,7 +1,7 @@
 // UI entry point: picks the day and renders it. The day is, in order:
 // a #YYYY-MM-DD fragment, a ?date=YYYY-MM-DD parameter, or today's date.
 import './style.css';
-import { generateInbox } from '../engine';
+import { dailyPuzzle } from '../engine';
 import { isoDate } from './format';
 import { renderGame } from './view';
 
@@ -16,7 +16,7 @@ function chosenDate(): string {
 function start(): void {
   const date = chosenDate();
   try {
-    renderGame(app, generateInbox(date));
+    renderGame(app, dailyPuzzle(date).inbox);
   } catch (err) {
     app.textContent = `Could not load the market for "${date}": ${(err as Error).message}`;
   }
