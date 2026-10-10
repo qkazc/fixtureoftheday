@@ -32,7 +32,7 @@ export const TRADES: readonly Trade[] = [
 export interface CargoOrder extends Trade {
   id: string;
   quantityTonnes: number;
-  /** Going rate in $/t: what gives a ship already at the load port the class's market TCE. */
+  /** Going rate in $/t: gives a ship with a typical ballast leg about the class's market TCE. */
   marketRateUsdPerTonne: number;
 }
 
@@ -53,6 +53,12 @@ export interface DailyMarket {
 export const CARGOES_PER_DAY = 4;
 /** Address commission + brokerage assumed when setting market rates. */
 export const MARKET_COMMISSION_PCT = 5;
+/**
+ * Market rates assume the ship sails this far empty to reach the load port.
+ * A ship closer than this can beat the market TCE at the market rate.
+ * PLACEHOLDER: a hand-picked "typical" ballast leg.
+ */
+export const TYPICAL_BALLAST_NM = 2_000;
 const RATE_NOISE = 0.1; // market rates vary up to ±10% around the target
 const SHIP_NAMES = [
   'Amber Tern', 'Blue Heron', 'Cape Lark', 'Coral Wren', 'Golden Kite', 'Iron Gull',
@@ -87,25 +93,38 @@ function makeCargo(rng: Rng, trade: Trade, id: string, bunkerPriceUsdPerTonne: n
   const spec = VESSEL_CLASSES[trade.vesselClass];
   const quantityTonnes =
     randomInt(rng, spec.cargoMinTonnes / 1000, spec.cargoMaxTonnes / 1000) * 1000;
+  const targetTce = spec.marketTceUsdPerDay * (1 + (rng() * 2 - 1) * RATE_NOISE);
+  const rate = rateForTce(trade, quantityTonnes, bunkerPriceUsdPerTonne, targetTce);
+  const marketRateUsdPerTonne = Math.round(rate * 20) / 20; // quoted to the nearest $0.05
+  return { ...trade, id, quantityTonnes, marketRateUsdPerTonne };
+}
 
+/**
+ * The freight rate ($/t) at which a ship of the trade's class, with a
+ * typical ballast leg, earns the target TCE.
+ */
+export function rateForTce(
+  trade: Trade,
+  quantityTonnes: number,
+  bunkerPriceUsdPerTonne: number,
+  targetTceUsdPerDay: number,
+): number {
+  const spec = VESSEL_CLASSES[trade.vesselClass];
   // Price the voyage at zero freight to get its days and costs, then solve
   // TCE = (freight × (1 − commission) − costs) / days for the freight rate.
   const v = calculateVoyage(
     spec.vessel,
     { quantityTonnes, freightRateUsdPerTonne: 0, commissionPct: MARKET_COMMISSION_PCT },
     {
-      ballastDistanceNm: 0,
+      ballastDistanceNm: TYPICAL_BALLAST_NM,
       ladenDistanceNm: distanceNm(trade.loadPort, trade.dischargePort),
       portDays: spec.portDays,
       portCostsUsd: spec.portCostsUsd,
     },
     { bunkerPriceUsdPerTonne },
   );
-  const targetTce = spec.marketTceUsdPerDay * (1 + (rng() * 2 - 1) * RATE_NOISE);
-  const rate =
-    (targetTce * v.totalDays + v.voyageCostsUsd) /
-    (quantityTonnes * (1 - MARKET_COMMISSION_PCT / 100));
-  const marketRateUsdPerTonne = Math.round(rate * 20) / 20; // quoted to the nearest $0.05
-
-  return { ...trade, id, quantityTonnes, marketRateUsdPerTonne };
+  return (
+    (targetTceUsdPerDay * v.totalDays + v.voyageCostsUsd) /
+    (quantityTonnes * (1 - MARKET_COMMISSION_PCT / 100))
+  );
 }

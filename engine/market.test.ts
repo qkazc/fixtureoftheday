@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { CARGOES_PER_DAY, generateMarket, MARKET_COMMISSION_PCT, TRADES } from './market';
-import { PORTS } from './ports';
+import {
+  CARGOES_PER_DAY,
+  generateMarket,
+  MARKET_COMMISSION_PCT,
+  rateForTce,
+  TRADES,
+  TYPICAL_BALLAST_NM,
+} from './market';
+import { distanceNm, PORTS } from './ports';
 import { VESSEL_CLASSES } from './vessels';
-import { buildRoute, calculateVoyage } from './voyage';
+import { calculateVoyage } from './voyage';
 
 // A spread of dates to check properties across many markets.
 const DATES = Array.from({ length: 60 }, (_, i) => {
@@ -53,7 +60,7 @@ describe('generateMarket', () => {
     }
   });
 
-  it('sets market rates so a ship at the load port earns about the class market TCE', () => {
+  it('sets market rates so a ship with a typical ballast leg earns about the class market TCE', () => {
     for (const date of DATES) {
       const m = generateMarket(date);
       for (const cargo of m.cargoes) {
@@ -65,11 +72,12 @@ describe('generateMarket', () => {
             freightRateUsdPerTonne: cargo.marketRateUsdPerTonne,
             commissionPct: MARKET_COMMISSION_PCT,
           },
-          buildRoute(
-            { openPort: cargo.loadPort, loadPort: cargo.loadPort, dischargePort: cargo.dischargePort },
-            spec.portDays,
-            spec.portCostsUsd,
-          ),
+          {
+            ballastDistanceNm: TYPICAL_BALLAST_NM,
+            ladenDistanceNm: distanceNm(cargo.loadPort, cargo.dischargePort),
+            portDays: spec.portDays,
+            portCostsUsd: spec.portCostsUsd,
+          },
           { bunkerPriceUsdPerTonne: m.bunkerPriceUsdPerTonne },
         );
         // ±10% noise, plus a little slack for rounding the rate to $0.05.
@@ -77,6 +85,24 @@ describe('generateMarket', () => {
         expect(v.tceUsdPerDay).toBeLessThan(spec.marketTceUsdPerDay * 1.12);
       }
     }
+  });
+
+  it('rateForTce gives exactly the target TCE before rounding', () => {
+    const trade = TRADES[0]!;
+    const spec = VESSEL_CLASSES[trade.vesselClass];
+    const rate = rateForTce(trade, 160_000, 600, 20_000);
+    const v = calculateVoyage(
+      spec.vessel,
+      { quantityTonnes: 160_000, freightRateUsdPerTonne: rate, commissionPct: MARKET_COMMISSION_PCT },
+      {
+        ballastDistanceNm: TYPICAL_BALLAST_NM,
+        ladenDistanceNm: distanceNm(trade.loadPort, trade.dischargePort),
+        portDays: spec.portDays,
+        portCostsUsd: spec.portCostsUsd,
+      },
+      { bunkerPriceUsdPerTonne: 600 },
+    );
+    expect(v.tceUsdPerDay).toBeCloseTo(20_000, 6);
   });
 
   it('only uses trades whose ports handle the commodity', () => {
