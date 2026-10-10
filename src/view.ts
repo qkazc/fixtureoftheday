@@ -257,13 +257,16 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
         step: '0.05',
         'aria-label': `Proposed rate for ${c.id} in dollars per tonne`,
       });
-      input.value = draftRates.get(c.id) ?? ((n.ownerOffer + n.chartererBid) / 2).toFixed(2);
+      // Start halfway between the positions, rounded to the $0.05 quoting step.
+      input.value = draftRates.get(c.id) ?? (Math.round(((n.ownerOffer + n.chartererBid) / 2) * 20) / 20).toFixed(2);
       input.addEventListener('input', () => draftRates.set(c.id, input.value));
       const outOfBudget = budgetLeft(selections) === 0;
       const final = isFinalRound(n);
       const proposeButton = el('button', { type: 'submit', value: 'propose' }, 'Send proposal');
       const firmButton = el('button', { type: 'submit', value: 'firm', title: HINTS.firm }, final ? 'Firm offer (last call)' : 'Firm offer');
-      const form = el('form', { class: 'propose' }, input, ...(final ? [firmButton] : [proposeButton, firmButton]));
+      // novalidate: rates are checked in the submit handler, so an off-step
+      // value like 29.07 is still sent rather than silently blocked.
+      const form = el('form', { class: 'propose', novalidate: '' }, input, ...(final ? [firmButton] : [proposeButton, firmButton]));
       for (const b of [input, proposeButton, firmButton]) b.disabled = outOfBudget;
       form.addEventListener('submit', (ev) => {
         ev.preventDefault();

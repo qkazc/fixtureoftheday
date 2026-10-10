@@ -28,6 +28,7 @@ function allPairs(): { market: DailyMarket; shipId: string; cargoId: string }[] 
   });
 }
 
+const midpointRate = (n: Negotiation) => Math.round(((n.ownerOffer + n.chartererBid) / 2) * 20) / 20;
 const midpoint = (n: Negotiation) => Math.round(((n.ownerOffer + n.chartererBid) / 2) * 20) / 20;
 
 describe('startNegotiation', () => {
@@ -60,14 +61,17 @@ describe('startNegotiation', () => {
 
 describe('propose', () => {
   it('agrees when the rate meets both current positions', () => {
-    const m = generateMarket('2026-10-10');
-    const c = m.cargoes[0]!;
-    let n = startNegotiation(m, m.ships.find((s) => s.vesselClass === c.vesselClass)!.id, c.id);
-    // Make the positions overlap by hand, then propose inside the overlap.
-    n = { ...n, ownerOffer: 10, chartererBid: 11 };
-    const done = propose(n, 10.5);
+    const pair = allPairs().find(({ market, shipId, cargoId }) => {
+      const l = startNegotiation(market, shipId, cargoId).limits;
+      return l.ownerFloorRate < l.chartererCeilingRate;
+    })!;
+    let n = startNegotiation(pair.market, pair.shipId, pair.cargoId);
+    // Put both sides at their limits, then propose between them.
+    n = { ...n, ownerOffer: n.limits.ownerFloorRate, chartererBid: n.limits.chartererCeilingRate };
+    const rate = (n.ownerOffer + n.chartererBid) / 2;
+    const done = propose(n, rate);
     expect(done.status).toBe('agreed');
-    expect(done.agreedRate).toBe(10.5);
+    expect(done.agreedRate).toBe(rate);
   });
 
   it('moves countering sides towards their limits, never past them', () => {
@@ -137,13 +141,18 @@ describe('propose', () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it('before the last call, only accepts rates that meet the current position', () => {
-    const m = generateMarket('2026-10-10');
-    const c = m.cargoes[0]!;
-    const n = startNegotiation(m, m.ships.find((s) => s.vesselClass === c.vesselClass)!.id, c.id);
-    // Inside the owner's limit but below their current offer: not yet.
-    const r = propose(n, (n.limits.ownerFloorRate + n.ownerOffer) / 2);
-    expect(r.history[0]!.ownerAccepted).toBe(false);
+  it('before the last call, accepts a proposal at least as good as its own counter, and never counters past it', () => {
+    for (const { market, shipId, cargoId } of allPairs()) {
+      const n = startNegotiation(market, shipId, cargoId);
+      if (n.ownerOffer <= n.chartererBid) continue; // openings already overlap
+      const after = propose(n, midpointRate(n));
+      const r = after.history[0]!;
+      if (!r.ownerAccepted) expect(after.ownerOffer).toBeGreaterThan(r.proposedRate);
+      if (!r.chartererAccepted) expect(after.chartererBid).toBeLessThan(r.proposedRate);
+      // A proposal inside the owner's limit but above their current offer is taken.
+      const generous = propose(n, n.ownerOffer + 1);
+      expect(generous.history[0]!.ownerAccepted).toBe(true);
+    }
   });
 
   it('fails after the last round without a deal', () => {

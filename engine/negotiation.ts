@@ -1,6 +1,7 @@
 // Negotiating a fixture. Each round the broker either:
-// - sends a proposal: each side accepts if it meets their current position,
-//   otherwise counters part of the way towards their hidden limit; or
+// - sends a proposal: each side works out its counter (part of the way from
+//   its current position towards its hidden limit) and accepts if the
+//   proposal is at least that good, otherwise replies with the counter; or
 // - makes a firm offer: each side accepts if it's within their hidden limit,
 //   and if either says no, the deal is dead.
 // The final round is always a last call, so a proposal there works like a
@@ -115,21 +116,20 @@ function play(n: Negotiation, rate: number, kind: RoundKind): Negotiation {
   }
   const s = n.limits;
   const firm = kind === 'firm';
-  const ownerAccepted = rate >= (firm ? s.ownerFloorRate : n.ownerOffer);
-  const chartererAccepted = rate <= (firm ? s.chartererCeilingRate : n.chartererBid);
+  // Where each side would move to if it countered this round.
+  const ownerCounter = Math.max(s.ownerFloorRate, roundUp(n.ownerOffer - (n.ownerOffer - s.ownerFloorRate) * s.ownerConcession));
+  const chartererCounter = Math.min(s.chartererCeilingRate, roundDown(n.chartererBid + (s.chartererCeilingRate - n.chartererBid) * s.chartererConcession));
+  // A side takes a proposal at least as good as its own counter (so it never
+  // counters past what you offered). A firm offer is judged against the limit.
+  const ownerAccepted = rate >= (firm ? s.ownerFloorRate : ownerCounter);
+  const chartererAccepted = rate <= (firm ? s.chartererCeilingRate : chartererCounter);
   const agreed = ownerAccepted && chartererAccepted;
 
-  // After a proposal, a side that says no counters part of the way to its limit.
-  // A firm offer gets no counters: it either closes or ends the talks.
+  // A side that says no to a proposal replies with its counter. A firm
+  // offer gets no counters: it either closes or ends the talks.
   const counter = !firm && !agreed;
-  const ownerOffer =
-    counter && !ownerAccepted
-      ? Math.max(s.ownerFloorRate, roundUp(n.ownerOffer - (n.ownerOffer - s.ownerFloorRate) * s.ownerConcession))
-      : n.ownerOffer;
-  const chartererBid =
-    counter && !chartererAccepted
-      ? Math.min(s.chartererCeilingRate, roundDown(n.chartererBid + (s.chartererCeilingRate - n.chartererBid) * s.chartererConcession))
-      : n.chartererBid;
+  const ownerOffer = counter && !ownerAccepted ? ownerCounter : n.ownerOffer;
+  const chartererBid = counter && !chartererAccepted ? chartererCounter : n.chartererBid;
 
   const history = [...n.history, { kind, proposedRate: rate, ownerAccepted, chartererAccepted, ownerOffer, chartererBid }];
   const status: NegotiationStatus = agreed
