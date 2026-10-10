@@ -59,6 +59,15 @@ npm run build:page   # build, then pack it into one HTML file:
 Every pull request and push to `main` runs the typecheck, the tests and the
 build on GitHub Actions (`.github/workflows/ci.yml`).
 
+## Publishing
+
+Every push to `main` publishes the game to GitHub Pages at
+**https://qkazc.github.io/fixtureoftheday/** (`.github/workflows/pages.yml`):
+it runs the checks, builds the single-file page and serves it as the site's
+home page. One-time setup: in the repository's Settings → Pages, set
+Source to "GitHub Actions". The share text links to this address
+(`PUBLIC_URL` in `src/share.ts`).
+
 ## Code layout
 
 - `engine/`: all game and shipping logic, in pure TypeScript with unit tests

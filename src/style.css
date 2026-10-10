@@ -206,5 +206,5 @@ button.tab.active { border-color: var(--accent); color: var(--accent); }
 
 /* End-of-day share box */
 .share-box { margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-pre.share { display: inline-block; min-width: min(100%, 26em); color: var(--fg); }
+pre.share { display: inline-block; box-sizing: border-box; min-width: min(100%, 26em); max-width: 100%; overflow-x: auto; color: var(--fg); }
 

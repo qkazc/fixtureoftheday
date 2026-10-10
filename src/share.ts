@@ -22,6 +22,13 @@ export function resultSquares(inbox: Inbox, summary: DaySummary): string {
     .join('');
 }
 
+/**
+ * Where friends can play. Fixed rather than read from the browser, because
+ * the game also runs in places whose own address isn't shareable (the dev
+ * server, a preview page).
+ */
+export const PUBLIC_URL = 'https://qkazc.github.io/fixtureoftheday/';
+
 /** `bestScore` is the best possible day's score (see solveDay), for the percentage. */
 export function shareText(inbox: Inbox, summary: DaySummary, bestScore: number): string {
   const enquiries = inbox.emails.filter((e) => e.kind === 'enquiry').length;
@@ -32,5 +39,6 @@ export function shareText(inbox: Inbox, summary: DaySummary, bestScore: number):
     `Score ${Math.round(summary.totalScore).toLocaleString('en-US')} · ${parPercent(summary.totalScore, bestScore)}% of the best possible`,
     `Owners ${pct(summary.avgOwnerSatisfaction)} · Charterers ${pct(summary.avgChartererSatisfaction)}`,
     resultSquares(inbox, summary),
+    PUBLIC_URL,
   ].join('\n');
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { attemptFix, endDay, generateInbox, isWorkable, negotiationLimits, solveDay, startDay, summarizeDay, type EnquiryEmail } from '../engine';
-import { resultSquares, shareText } from './share';
+import { PUBLIC_URL, resultSquares, shareText } from './share';
 
 const inbox = generateInbox('2026-10-10');
 const best = solveDay(inbox).score;
@@ -17,6 +17,7 @@ describe('shareText', () => {
       'Score 0 · 0% of the best possible',
       'Owners – · Charterers –',
       '⬛'.repeat(enquiries.length),
+      PUBLIC_URL,
     ]);
   });
 
