@@ -90,11 +90,11 @@ Places where the game deliberately differs from reality, and why.
 ### The desk map (`src/mapData.ts`, `src/mapGeometry.ts`)
 - **Hand-drawn, low-poly world.** Continents are a few dozen points each,
   and ports are placed by rough coordinates.
-- **Straight lines, not routes.** Voyage and ballast lines go straight from
-  port to port (wrapping across the Pacific where that's shorter). Real
-  ships follow sea lanes round capes and through canals, so a line from
-  Santos to Qingdao crosses Africa on the map while the ship would sail
-  round the Cape of Good Hope.
+- **Drawn lanes, not real routing.** Voyage and ballast lines follow about
+  60 hand-placed sea waypoints (Gibraltar, Suez, the Cape, Malacca, Panama
+  and so on), taking the shortest way through them. This is drawing only:
+  voyage distances still come from the game's distance table. Every lane
+  can use Suez and Panama, whatever the ship's size.
 
 ## Placeholder numbers
 

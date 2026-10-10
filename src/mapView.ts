@@ -4,7 +4,7 @@
 
 import { calendarDay, fitCheck, PORTS, type CargoOrder, type Inbox, type PortId, type ShipOffer } from '../engine';
 import { LAND, PORT_POSITIONS } from './mapData';
-import { lineSegments, MAP_HEIGHT, MAP_WIDTH, project, ringPath } from './mapGeometry';
+import { MAP_HEIGHT, MAP_WIDTH, project, ringPath, voyageSegments } from './mapGeometry';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -38,7 +38,7 @@ export function drawMap(inbox: Inbox, focus: MapFocus = { cargo: null, fixedShip
   for (const ring of LAND) map.append(svg('path', { d: ringPath(ring), class: 'land' }));
 
   const line = (from: PortId, to: PortId, cls: string) => {
-    for (const [a, b] of lineSegments(PORT_POSITIONS[from], PORT_POSITIONS[to])) {
+    for (const [a, b] of voyageSegments(from, to)) {
       map.append(svg('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: cls }));
     }
   };

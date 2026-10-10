@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LAND, PORT_POSITIONS } from './mapData';
-import { lineSegments, MAP_HEIGHT, MAP_WIDTH, project, ringPath } from './mapGeometry';
+import { LAND, PORT_POSITIONS, SEA_LANES, SEA_POINTS } from './mapData';
+import { lineSegments, MAP_HEIGHT, MAP_WIDTH, nodePosition, project, ringPath, seaPath } from './mapGeometry';
 import { PORT_IDS } from '../engine';
 
 describe('project', () => {
@@ -53,5 +53,62 @@ describe('ringPath', () => {
       expect(d.startsWith('M')).toBe(true);
       expect(d.endsWith('Z')).toBe(true);
     }
+  });
+});
+
+describe('sea lanes', () => {
+  /** Even-odd ray cast against the hand-drawn land rings, in lon/lat. */
+  const onLand = (lon: number, lat: number) =>
+    LAND.some((ring) => {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i]!;
+        const [xj, yj] = ring[j]!;
+        if (yi > lat !== yj > lat && lon < xi + ((lat - yi) / (yj - yi)) * (xj - xi)) inside = !inside;
+      }
+      return inside;
+    });
+
+  it('keeps every lane in the water (canals excepted)', () => {
+    const crossings: string[] = [];
+    for (const [a, b, kind] of SEA_LANES) {
+      if (kind === 'canal') continue;
+      const p = nodePosition(a);
+      let q = nodePosition(b);
+      // Go the shorter way round, across the date line if need be.
+      if (q[0] - p[0] > 180) q = [q[0] - 360, q[1]];
+      if (q[0] - p[0] < -180) q = [q[0] + 360, q[1]];
+      for (let i = 1; i < 40; i++) {
+        const t = i / 40;
+        let lon = p[0] + t * (q[0] - p[0]);
+        const lat = p[1] + t * (q[1] - p[1]);
+        if (lon > 180) lon -= 360;
+        if (lon < -180) lon += 360;
+        // Ports sit on the coast, so the first and last couple of degrees may touch land.
+        const nearPort = (id: string, pt: readonly number[]) =>
+          id in PORT_POSITIONS && Math.hypot(lon - pt[0]!, lat - pt[1]!) < 2;
+        if (nearPort(a, p) || nearPort(b, nodePosition(b))) continue;
+        if (onLand(lon, lat)) {
+          crossings.push(`${a} -> ${b} at [${lon.toFixed(1)}, ${lat.toFixed(1)}]`);
+          break;
+        }
+      }
+    }
+    expect(crossings).toEqual([]);
+  });
+
+  it('connects every port to every other port', () => {
+    for (const a of PORT_IDS) {
+      for (const b of PORT_IDS) {
+        const path = seaPath(a, b);
+        expect(path[0]).toEqual(PORT_POSITIONS[a]);
+        expect(path.at(-1)).toEqual(PORT_POSITIONS[b]);
+      }
+    }
+  });
+
+  it('sends Brazil to China round the Cape of Good Hope, and Rotterdam to Mundra through Suez', () => {
+    expect(seaPath('tubarao', 'qingdao')).toContainEqual(SEA_POINTS.capeOfGoodHope);
+    expect(seaPath('rotterdam', 'mundra')).toContainEqual(SEA_POINTS.portSaid);
   });
 });

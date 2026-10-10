@@ -61,7 +61,7 @@ export const LAND: readonly (readonly LonLat[])[] = [
     [99, 10], [101, 6.5], [103.5, 1.3], [101, 2.5], [98.5, 8], [98.5, 13], [97.5, 17], [94.5, 16], [94, 19],
     [91.8, 22.5], [88, 22], [86.5, 20], [80.3, 15.5], [80, 10], [77.5, 8], [76, 10], [73, 17], [72.8, 21],
     [70, 22.5], [68.5, 23.5], [66.5, 25.5], [61.5, 25.2], [57, 23.5], [59.8, 22.5], [55, 17], [52, 15.6],
-    [45, 12.8], [43, 12.8], [43, 15], [39, 21.5], [35, 28], [34.5, 29.5], [34.2, 31.3], [35, 33],
+    [45, 12.8], [43.5, 12.75], [42.8, 14.8], [39, 21.5], [35, 28], [34.5, 29.5], [34.2, 31.3], [35, 33],
     [36, 35.5], [33, 36.2], [27, 37], [26.5, 40], [23, 40.5], [21, 38.5], [22, 36.5], [19.5, 40],
     [18.5, 42], [13.5, 45.5], [12.3, 44.5], [16, 41.5], [18.5, 40], [16, 38], [15.6, 38], [12, 41],
     [10, 44], [7, 43.5], [3, 43.2], [3.2, 41.8], [0, 39], [-0.5, 37.6], [-2, 36.7], [-5.6, 36], [-6.5, 36.9],
@@ -76,7 +76,7 @@ export const LAND: readonly (readonly LonLat[])[] = [
   // Greenland
   [[-45, 60], [-52, 64], [-55, 70], [-60, 76], [-70, 78], [-30, 80], [-20, 78], [-18, 75], [-22, 70], [-32, 68], [-40, 65]],
   // Great Britain and Ireland
-  [[-5.7, 50], [1.5, 51], [1.7, 52.7], [0, 53.5], [-1.5, 55], [-2, 57.7], [-3, 58.6], [-5, 58.6], [-6, 56.5], [-5, 55], [-3, 54.5], [-3.3, 53.3], [-4.5, 52.8], [-5.2, 51.7]],
+  [[-5.7, 50], [1.3, 51.2], [1.7, 52.7], [0, 53.5], [-1.5, 55], [-2, 57.7], [-3, 58.6], [-5, 58.6], [-6, 56.5], [-5, 55], [-3, 54.5], [-3.3, 53.3], [-4.5, 52.8], [-5.2, 51.7]],
   [[-6, 52], [-6, 54], [-8, 55.2], [-10, 54], [-10, 52], [-8, 51.5]],
   // Iceland
   [[-24, 65.5], [-22, 66.4], [-16, 66.5], [-13.5, 65], [-15, 64.3], [-18, 63.4], [-22, 63.8]],
@@ -94,4 +94,119 @@ export const LAND: readonly (readonly LonLat[])[] = [
   [[120, 18.5], [122, 18.5], [122.5, 14], [124, 12.5], [126, 9], [126, 6.5], [125, 6], [122, 7], [123.5, 10.5], [121, 13], [120, 15]],
   [[-85, 22], [-82, 23.1], [-77, 22], [-74.2, 20.2], [-77.7, 19.9], [-80, 21.8]],
   [[172.7, -34.5], [174.5, -36.5], [178, -37.7], [176.8, -40], [174.8, -41.4], [173, -41], [172, -43.5], [170.5, -46], [168, -46.5], [166.5, -45.5], [168.5, -43.5], [172, -41]],
+];
+
+/**
+ * Sea waypoints for drawing voyages round the land instead of across it.
+ * PLACEHOLDER: hand-placed in open water between the outlines above.
+ */
+export const SEA_POINTS = {
+  gulfOfMexico: [-88, 25],
+  yucatan: [-86, 21],
+  floridaStrait: [-81, 23.8],
+  bahamas: [-78, 26],
+  atlanticWest: [-65, 32],
+  caribbeanEast: [-65, 14],
+  panamaCaribbean: [-79.5, 10.5],
+  panamaPacific: [-79.5, 7],
+  pacificEast: [-120, 12],
+  pacificWest: [155, 20],
+  philippineSea: [131, 15],
+  eastChinaSea: [124, 29],
+  taiwanStrait: [119, 22],
+  southChinaSea: [110, 8],
+  singaporeStrait: [104.3, 0.9],
+  malaccaSouth: [101, 2],
+  malaccaStrait: [99.5, 4.5],
+  sumatraNorth: [95, 7.5],
+  sriLankaSouth: [81, 4.5],
+  arabianSea: [64, 16],
+  gulfOfAden: [50, 13.2],
+  babElMandeb: [43.8, 12.6],
+  redSeaSouth: [40.8, 16],
+  redSeaMouth: [42.85, 13],
+  redSeaNorth: [34.8, 27.5],
+  portSaid: [32.3, 31.7],
+  crete: [25, 34.2],
+  sicilyChannel: [12, 37.6],
+  algeria: [3, 37.5],
+  gibraltar: [-5.7, 35.9],
+  stVincent: [-10, 36.5],
+  finisterre: [-11, 43],
+  channelApproach: [-6, 48.5],
+  englishChannel: [-1, 50.1],
+  doverStrait: [1.7, 50.95],
+  northSea: [2.6, 51.5],
+  canaries: [-15.5, 28.5],
+  capeVerde: [-20, 14],
+  offKamsar: [-17, 10],
+  gulfOfGuinea: [-5, 0],
+  southAtlantic: [8, -20],
+  brazilNorth: [-45, 3],
+  brazilEast: [-32, -6],
+  offTubarao: [-38, -21],
+  offSantos: [-45, -26],
+  capeOfGoodHope: [19, -36.5],
+  agulhas: [27, -36.5],
+  offRichardsBay: [35, -29.5],
+  mozambiqueChannel: [40, -20],
+  comoros: [42, -11],
+  indianSouth: [60, -30],
+  capeLeeuwin: [113, -37],
+  sharkBay: [109, -25],
+  offPortHedland: [117, -18.5],
+  lombokSouth: [115.8, -11],
+  lombok: [115.8, -8.6],
+  makassar: [118.5, -3],
+  celebesSea: [121, 3],
+  mindanaoSouth: [126.5, 4.5],
+  newGuineaNorth: [142, 2],
+  solomonSea: [153, -6],
+  coralSea: [156, -15],
+  offNewcastle: [154, -33],
+  bassStrait: [146, -41],
+  capeHowe: [151.5, -38.5],
+  greatBight: [130, -36],
+} as const satisfies Record<string, LonLat>;
+
+export type SeaPointId = keyof typeof SEA_POINTS;
+export type MapNode = PortId | SeaPointId;
+
+/** Two-way sea lanes. Canals cross land on purpose. */
+export const SEA_LANES: readonly (readonly [MapNode, MapNode, 'canal'?])[] = [
+  // Americas
+  ['usGulf', 'gulfOfMexico'], ['gulfOfMexico', 'yucatan'], ['gulfOfMexico', 'floridaStrait'],
+  ['floridaStrait', 'bahamas'], ['bahamas', 'atlanticWest'], ['yucatan', 'panamaCaribbean'],
+  ['yucatan', 'caribbeanEast'], ['caribbeanEast', 'brazilNorth'], ['brazilNorth', 'brazilEast'],
+  ['panamaCaribbean', 'panamaPacific', 'canal'], ['panamaPacific', 'pacificEast'],
+  // North Atlantic and Europe
+  ['atlanticWest', 'channelApproach'], ['channelApproach', 'englishChannel'], ['englishChannel', 'doverStrait'], ['doverStrait', 'northSea'],
+  ['northSea', 'rotterdam'], ['channelApproach', 'finisterre'], ['finisterre', 'stVincent'],
+  ['finisterre', 'canaries'], ['stVincent', 'gibraltar'], ['canaries', 'capeVerde'],
+  // Mediterranean, Suez, Red Sea
+  ['gibraltar', 'algeria'], ['algeria', 'sicilyChannel'], ['sicilyChannel', 'crete'], ['crete', 'portSaid'],
+  ['portSaid', 'redSeaNorth', 'canal'], ['redSeaNorth', 'redSeaSouth'], ['redSeaSouth', 'redSeaMouth'], ['redSeaMouth', 'babElMandeb'],
+  ['babElMandeb', 'gulfOfAden'], ['gulfOfAden', 'arabianSea'],
+  // West Africa and South Atlantic
+  ['kamsar', 'offKamsar'], ['offKamsar', 'capeVerde'], ['offKamsar', 'gulfOfGuinea'],
+  ['capeVerde', 'brazilEast'], ['gulfOfGuinea', 'southAtlantic'], ['southAtlantic', 'capeOfGoodHope'],
+  ['tubarao', 'offTubarao'], ['santos', 'offSantos'], ['offSantos', 'offTubarao'], ['offTubarao', 'brazilEast'],
+  ['offTubarao', 'capeOfGoodHope'], ['offSantos', 'capeOfGoodHope'],
+  // Southern Africa and the Indian Ocean
+  ['capeOfGoodHope', 'agulhas'], ['agulhas', 'offRichardsBay'], ['offRichardsBay', 'richardsBay'],
+  ['offRichardsBay', 'mozambiqueChannel'], ['mozambiqueChannel', 'comoros'], ['comoros', 'arabianSea'],
+  ['agulhas', 'indianSouth'], ['indianSouth', 'sriLankaSouth'], ['indianSouth', 'capeLeeuwin'],
+  ['indianSouth', 'lombokSouth'], ['arabianSea', 'mundra'], ['arabianSea', 'sriLankaSouth'],
+  // South-east Asia and China
+  ['sriLankaSouth', 'sumatraNorth'], ['sumatraNorth', 'malaccaStrait'], ['malaccaStrait', 'malaccaSouth'],
+  ['malaccaSouth', 'singaporeStrait'], ['singaporeStrait', 'southChinaSea'], ['southChinaSea', 'taiwanStrait'],
+  ['taiwanStrait', 'eastChinaSea'], ['eastChinaSea', 'qingdao'], ['philippineSea', 'eastChinaSea'],
+  ['lombokSouth', 'lombok'], ['lombok', 'makassar'], ['makassar', 'celebesSea'], ['celebesSea', 'mindanaoSouth'],
+  ['mindanaoSouth', 'philippineSea'], ['pacificWest', 'philippineSea'], ['pacificEast', 'pacificWest'],
+  // Australia
+  ['portHedland', 'offPortHedland'], ['offPortHedland', 'lombokSouth'], ['offPortHedland', 'sriLankaSouth'],
+  ['offPortHedland', 'indianSouth'], ['offPortHedland', 'sharkBay'], ['sharkBay', 'capeLeeuwin'],
+  ['capeLeeuwin', 'greatBight'], ['greatBight', 'bassStrait'], ['bassStrait', 'capeHowe'], ['capeHowe', 'offNewcastle'],
+  ['newcastle', 'offNewcastle'], ['offNewcastle', 'coralSea'], ['coralSea', 'solomonSea'],
+  ['solomonSea', 'newGuineaNorth'], ['newGuineaNorth', 'philippineSea'], ['offNewcastle', 'pacificEast'],
 ];
