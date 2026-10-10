@@ -36,6 +36,11 @@ at one can add days or weeks to voyages.
 fuel, fresh water, stores and crew. Because fuel and stores take up some of
 it, the cargo a ship can actually lift is always a bit less than its DWT.
 
+**Deal zone**: The range of rates both sides could accept: above the owner's
+minimum and below the charterer's maximum. A general negotiation term (also
+called ZOPA, "zone of possible agreement"). If the two limits don't overlap,
+no deal is possible.
+
 **Demurrage**: Money the charterer pays the owner when loading or discharging
 takes longer than the time allowed in the contract. It compensates the owner
 for the ship being stuck in port.

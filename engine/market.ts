@@ -59,6 +59,14 @@ export const MARKET_COMMISSION_PCT = 5;
  * PLACEHOLDER: a hand-picked "typical" ballast leg.
  */
 export const TYPICAL_BALLAST_NM = 2_000;
+/**
+ * Each cargo's matching ship opens at most this far from the load port.
+ * PLACEHOLDER: tuned for gameplay. (US Gulf has no other port this close,
+ * so its matching ship always opens there.)
+ */
+export const NEARBY_OPEN_NM = 4_000;
+/** Within this distance a matching ship counts as "close" rather than "medium". */
+export const CLOSE_OPEN_NM = 1_000;
 const RATE_NOISE = 0.1; // market rates vary up to ±10% around the target
 const SHIP_NAMES = [
   'Amber Tern', 'Blue Heron', 'Cape Lark', 'Coral Wren', 'Golden Kite', 'Iron Gull',
@@ -76,17 +84,32 @@ export function generateMarket(date: string): DailyMarket {
     .slice(0, CARGOES_PER_DAY)
     .map((trade, i) => makeCargo(rng, trade, `C${i + 1}`, bunkerPriceUsdPerTonne));
 
-  // One ship that fits each cargo, so every day is solvable, plus one spare.
-  const classes = [...cargoes.map((c) => c.vesselClass), pick(rng, VESSEL_CLASS_IDS)];
+  // One ship per cargo, of the right class and open within NEARBY_OPEN_NM of
+  // its load port, so every day has a sensible match. Plus one spare ship,
+  // open anywhere, as a decoy. Shuffled so the order gives nothing away.
+  const placements: { vesselClass: VesselClass; openPort: PortId }[] = [
+    ...cargoes.map((c) => ({ vesselClass: c.vesselClass, openPort: nearbyPort(rng, c.loadPort) })),
+    { vesselClass: pick(rng, VESSEL_CLASS_IDS), openPort: pick(rng, PORT_IDS) },
+  ];
   const names = shuffle(rng, SHIP_NAMES);
-  const ships = shuffle(rng, classes).map((vesselClass, i) => ({
+  const ships = shuffle(rng, placements).map((placement, i) => ({
     id: `S${i + 1}`,
     name: names[i]!,
-    vesselClass,
-    openPort: pick(rng, PORT_IDS),
+    ...placement,
   }));
 
   return { date, bunkerPriceUsdPerTonne, cargoes, ships };
+}
+
+/** A port near the load port: half the time close, half the time medium distance. */
+function nearbyPort(rng: Rng, loadPort: PortId): PortId {
+  const close = PORT_IDS.filter((p) => distanceNm(p, loadPort) <= CLOSE_OPEN_NM);
+  const medium = PORT_IDS.filter((p) => {
+    const nm = distanceNm(p, loadPort);
+    return nm > CLOSE_OPEN_NM && nm <= NEARBY_OPEN_NM;
+  });
+  // `close` always includes the load port itself; `medium` can be empty.
+  return pick(rng, medium.length > 0 && rng() < 0.5 ? medium : close);
 }
 
 function makeCargo(rng: Rng, trade: Trade, id: string, bunkerPriceUsdPerTonne: number): CargoOrder {
@@ -100,14 +123,15 @@ function makeCargo(rng: Rng, trade: Trade, id: string, bunkerPriceUsdPerTonne: n
 }
 
 /**
- * The freight rate ($/t) at which a ship of the trade's class, with a
- * typical ballast leg, earns the target TCE.
+ * The freight rate ($/t) at which a ship of the trade's class earns the
+ * target TCE, given its ballast leg (a typical one by default).
  */
 export function rateForTce(
   trade: Trade,
   quantityTonnes: number,
   bunkerPriceUsdPerTonne: number,
   targetTceUsdPerDay: number,
+  ballastDistanceNm = TYPICAL_BALLAST_NM,
 ): number {
   const spec = VESSEL_CLASSES[trade.vesselClass];
   // Price the voyage at zero freight to get its days and costs, then solve
@@ -116,7 +140,7 @@ export function rateForTce(
     spec.vessel,
     { quantityTonnes, freightRateUsdPerTonne: 0, commissionPct: MARKET_COMMISSION_PCT },
     {
-      ballastDistanceNm: TYPICAL_BALLAST_NM,
+      ballastDistanceNm,
       ladenDistanceNm: distanceNm(trade.loadPort, trade.dischargePort),
       portDays: spec.portDays,
       portCostsUsd: spec.portCostsUsd,

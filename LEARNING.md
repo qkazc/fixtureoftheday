@@ -72,7 +72,8 @@ figures later.
   cargo ranges, port days and costs, and market TCE (Supramax $13,000,
   Panamax $14,000, Capesize $20,000 a day). Plausible, hand-picked.
 - **Market** (`engine/market.ts`): bunkers $550–650/t, 5% commission, ±10%
-  rate noise, 2,000 nm typical ballast leg. Hand-picked.
+  rate noise, 2,000 nm typical ballast leg. Each cargo's matching ship opens
+  within 4,000 nm of the load port (half within 1,000 nm). Hand-picked.
 - **Scoring** (`engine/scoring.ts`): ±20% satisfaction bands, tuned for
   gameplay. Brokerage of 1.25% is a common real-world figure, not sourced
   for this project.

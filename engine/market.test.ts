@@ -2,20 +2,36 @@ import { describe, expect, it } from 'vitest';
 import {
   CARGOES_PER_DAY,
   generateMarket,
+  CLOSE_OPEN_NM,
   MARKET_COMMISSION_PCT,
+  NEARBY_OPEN_NM,
   rateForTce,
   TRADES,
   TYPICAL_BALLAST_NM,
+  type CargoOrder,
+  type ShipOffer,
 } from './market';
 import { distanceNm, PORTS } from './ports';
+import { SATISFACTION_BAND } from './scoring';
 import { VESSEL_CLASSES } from './vessels';
 import { calculateVoyage } from './voyage';
 
-// A spread of dates to check properties across many markets.
-const DATES = Array.from({ length: 60 }, (_, i) => {
-  const d = new Date(Date.UTC(2026, 0, 1 + i * 6));
+// 100 dates to check properties across many markets.
+const DATES = Array.from({ length: 100 }, (_, i) => {
+  const d = new Date(Date.UTC(2026, 0, 1 + i * 4));
   return d.toISOString().slice(0, 10);
 });
+
+function hasNearbyMatching(cargoes: readonly CargoOrder[], ships: readonly ShipOffer[]): boolean {
+  const [cargo, ...rest] = cargoes;
+  if (!cargo) return true;
+  return ships.some(
+    (ship, i) =>
+      ship.vesselClass === cargo.vesselClass &&
+      distanceNm(ship.openPort, cargo.loadPort) <= NEARBY_OPEN_NM &&
+      hasNearbyMatching(rest, ships.filter((_, j) => j !== i)),
+  );
+}
 
 describe('generateMarket', () => {
   it('gives the same market for the same date', () => {
@@ -38,13 +54,9 @@ describe('generateMarket', () => {
     expect(m.bunkerPriceUsdPerTonne).toBeLessThanOrEqual(650);
     expect(new Set(m.ships.map((s) => s.name)).size).toBe(m.ships.length);
 
-    // Every cargo can be matched to a different ship of its class.
-    const freeShips = [...m.ships];
-    for (const cargo of m.cargoes) {
-      const i = freeShips.findIndex((s) => s.vesselClass === cargo.vesselClass);
-      expect(i).toBeGreaterThanOrEqual(0);
-      freeShips.splice(i, 1);
-    }
+    // Every cargo can be matched to a different ship of its class that is
+    // open nearby (checked by trying every assignment; the market is tiny).
+    expect(hasNearbyMatching(m.cargoes, m.ships)).toBe(true);
 
     for (const cargo of m.cargoes) {
       const spec = VESSEL_CLASSES[cargo.vesselClass];
@@ -103,6 +115,43 @@ describe('generateMarket', () => {
       { bunkerPriceUsdPerTonne: 600 },
     );
     expect(v.tceUsdPerDay).toBeCloseTo(20_000, 6);
+  });
+
+  it('gives every cargo at least one ship with a positive deal zone, on 100 dates', () => {
+    // Deal zone: rates both sides could accept. The owner needs a TCE above
+    // (1 - band) × market; the charterer won't pay above (1 + band) × market rate.
+    for (const date of DATES) {
+      const m = generateMarket(date);
+      for (const cargo of m.cargoes) {
+        const spec = VESSEL_CLASSES[cargo.vesselClass];
+        const chartererMax = cargo.marketRateUsdPerTonne * (1 + SATISFACTION_BAND);
+        const hasDealZone = m.ships.some((ship) => {
+          if (ship.vesselClass !== cargo.vesselClass) return false;
+          const ownerMin = rateForTce(
+            cargo,
+            cargo.quantityTonnes,
+            m.bunkerPriceUsdPerTonne,
+            spec.marketTceUsdPerDay * (1 - SATISFACTION_BAND),
+            distanceNm(ship.openPort, cargo.loadPort),
+          );
+          return ownerMin < chartererMax;
+        });
+        expect(hasDealZone, `${date} cargo ${cargo.id}`).toBe(true);
+      }
+    }
+  });
+
+  it('spreads matching ships between close and medium distances', () => {
+    const ballasts = DATES.flatMap((date) => {
+      const m = generateMarket(date);
+      return m.cargoes.flatMap((c) =>
+        m.ships
+          .filter((s) => s.vesselClass === c.vesselClass)
+          .map((s) => distanceNm(s.openPort, c.loadPort)),
+      );
+    });
+    expect(ballasts.some((nm) => nm <= CLOSE_OPEN_NM)).toBe(true);
+    expect(ballasts.some((nm) => nm > CLOSE_OPEN_NM && nm <= NEARBY_OPEN_NM)).toBe(true);
   });
 
   it('only uses trades whose ports handle the commodity', () => {
