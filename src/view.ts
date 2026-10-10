@@ -2,7 +2,16 @@
 // built once; on each change only the dropdowns, results and totals update,
 // so typing in a rate box never loses focus.
 
-import { distanceNm, PORTS, type DailyMarket, type FixtureResult } from '../engine';
+import {
+  distanceNm,
+  isFinalRound,
+  MAX_ROUNDS,
+  PORTS,
+  type CargoOrder,
+  type DailyMarket,
+  type FixtureResult,
+  type NegotiationRound,
+} from '../engine';
 import {
   formatClass,
   formatCommodity,
@@ -13,7 +22,17 @@ import {
   formatUsd,
   formatUsdPerDay,
 } from './format';
-import { availableShips, evaluate, initialSelections, type Selections } from './state';
+import {
+  availableShips,
+  chooseShip,
+  evaluate,
+  initialSelections,
+  isLocked,
+  sendProposal,
+  voyageOutline,
+  type Selection,
+  type Selections,
+} from './state';
 
 // Short definitions shown on hover. Fuller ones live in GLOSSARY.md.
 const HINTS = {
@@ -25,7 +44,9 @@ const HINTS = {
   bunkers: 'Bunkers: ship fuel. Usually the biggest voyage cost.',
   owner: 'Shipowner satisfaction: 50 means they earn the market TCE for their class; ±20% takes it to 100 or 0.',
   charterer: 'Charterer satisfaction: 50 means they pay the market rate; 20% cheaper is 100, 20% dearer is 0.',
-  score: 'Score: brokerage × (owner + charterer satisfaction) ÷ 100. A refused fixture scores nothing.',
+  score: 'Score: brokerage × (owner + charterer satisfaction) ÷ 100.',
+  offer: 'Offer: the rate the owner is currently asking. Owners offer; charterers bid.',
+  bid: 'Bid: the rate the charterer is currently willing to pay.',
 } as const;
 
 type Attrs = Record<string, string>;
@@ -64,8 +85,6 @@ function satisfactionBadge(value: number): HTMLElement {
 }
 
 export function renderGame(root: HTMLElement, market: DailyMarket): void {
-  const selections: Selections = initialSelections(market);
-
   root.replaceChildren(
     el(
       'header',
@@ -100,118 +119,147 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
     ),
   );
 
-  // Fixture builder: one row per cargo.
-  const selects = new Map<string, HTMLSelectElement>();
-  const resultCells = new Map<string, HTMLTableCellElement[]>();
-  const rows = market.cargoes.map((c) => {
-    const select = el('select', { 'aria-label': `Ship for ${c.id}` });
-    select.addEventListener('change', () => {
-      selections[c.id]!.shipId = select.value || null;
-      update();
-    });
-    selects.set(c.id, select);
+  // Deal desk: one card per cargo with the ship choice and the negotiation.
+  let selections: Selections = initialSelections(market);
+  const draftRates = new Map<string, string>();
+  const desk = el('div', { class: 'desk' });
+  const totals = el('p', { class: 'totals' });
+  root.append(el('h2', {}, 'Deal desk'), desk, totals);
 
-    const rate = el('input', {
-      type: 'number',
-      min: '0',
-      step: '0.05',
-      value: c.marketRateUsdPerTonne.toFixed(2),
-      'aria-label': `Rate for ${c.id} in dollars per tonne`,
-    });
-    rate.addEventListener('input', () => {
-      selections[c.id]!.rateUsdPerTonne = rate.valueAsNumber;
-      update();
-    });
-
-    const cells = Array.from({ length: 7 }, () => el('td', { class: 'num' }));
-    resultCells.set(c.id, cells);
-    return el('tr', {}, el('td', {}, c.id), el('td', {}, select), el('td', {}, rate), ...cells);
-  });
-
-  const totalBrokerage = el('strong');
-  const totalScore = el('strong');
-  root.append(
-    el('h2', {}, 'Your fixtures'),
-    el(
-      'div',
-      { class: 'scroll' },
-      el(
-        'table',
-        { class: 'fixtures' },
-        el(
-          'thead',
-          {},
-          el(
-            'tr',
-            {},
-            ...['Cargo', 'Ship', 'Rate $/t', term('Ballast', HINTS.ballast), 'Days',
-              term('Owner TCE', HINTS.tce), term('Owner', HINTS.owner),
-              term('Charterer', HINTS.charterer), term('Brokerage', HINTS.brokerage),
-              term('Score', HINTS.score)].map((h) => el('th', {}, h)),
-          ),
-        ),
-        el('tbody', {}, ...rows),
-      ),
-    ),
-    el(
-      'p',
-      { class: 'totals' },
-      'Total brokerage ',
-      totalBrokerage,
-      ' · Day score ',
-      totalScore,
-    ),
-  );
-
-  function update(): void {
-    // Refresh each dropdown so a ship can't be chosen for two cargoes.
-    for (const c of market.cargoes) {
-      const select = selects.get(c.id)!;
-      const chosen = selections[c.id]!.shipId;
-      select.replaceChildren(
-        el('option', { value: '' }, '— no ship —'),
-        ...availableShips(market, selections, c.id).map((s) =>
-          el('option', { value: s.id }, `${s.name} (open ${portName(s.openPort)})`),
-        ),
-      );
-      select.value = chosen ?? '';
-    }
-
-    const e = evaluate(market, selections);
-    for (const c of market.cargoes) {
-      fillResult(market, resultCells.get(c.id)!, e.byCargo[c.id] ?? null);
-    }
-    totalBrokerage.textContent = formatUsd(e.totalBrokerageUsd);
-    totalScore.textContent = whole(e.totalScore);
+  function act(next: Selections): void {
+    selections = next;
+    render();
   }
 
-  update();
+  function render(): void {
+    const e = evaluate(market, selections);
+    desk.replaceChildren(
+      ...market.cargoes.map((c) => dealCard(c, selections[c.id]!, e.byCargo[c.id] ?? null)),
+    );
+    totals.replaceChildren(
+      'Total brokerage ',
+      el('strong', {}, formatUsd(e.totalBrokerageUsd)),
+      ' · Day score ',
+      el('strong', {}, whole(e.totalScore)),
+    );
+  }
+
+  function dealCard(c: CargoOrder, sel: Selection, result: FixtureResult | null): HTMLElement {
+    const card = el(
+      'section',
+      { class: 'card', 'aria-label': `Cargo ${c.id}` },
+      el('h3', {}, `${c.id} · ${formatTonnes(c.quantityTonnes)} ${formatCommodity(c.commodity).toLowerCase()}`),
+      el(
+        'p',
+        { class: 'meta' },
+        `${portName(c.loadPort)} → ${portName(c.dischargePort)} · ${formatClass(c.vesselClass)} · market ${formatRate(c.marketRateUsdPerTonne)}`,
+      ),
+    );
+
+    // Ship choice, with each ship's empty-sail distance to the load port.
+    const select = el('select', { id: `ship-${c.id}`, 'aria-label': `Ship for ${c.id}` });
+    select.append(
+      el('option', { value: '' }, '— choose a ship —'),
+      ...availableShips(market, selections, c.id).map((s) =>
+        el('option', { value: s.id }, `${s.name}, open ${portName(s.openPort)}, ${formatNm(distanceNm(s.openPort, c.loadPort))} away`),
+      ),
+    );
+    select.value = sel.shipId ?? '';
+    select.disabled = isLocked(sel);
+    select.addEventListener('change', () => act(chooseShip(market, selections, c.id, select.value || null)));
+    card.append(select);
+
+    const n = sel.negotiation;
+    if (!sel.shipId || !n) {
+      card.append(el('p', { class: 'hint' }, 'Choose a ship to open talks with its owner and the charterer.'));
+      return card;
+    }
+
+    const outline = voyageOutline(market, sel.shipId, c.id);
+    card.append(
+      el('p', { class: 'meta' }, term('Ballast', HINTS.ballast), ` ${formatNm(outline.ballastNm)} · about ${formatDays(outline.days)}`),
+    );
+
+    if (n.status === 'open') {
+      card.append(
+        el(
+          'p',
+          { class: 'positions' },
+          term('Owners offer', HINTS.offer), ' ', el('strong', {}, formatRate(n.ownerOffer)),
+          ' · ',
+          term('Charterers bid', HINTS.bid), ' ', el('strong', {}, formatRate(n.chartererBid)),
+        ),
+        el(
+          'p',
+          { class: isFinalRound(n) ? 'round last' : 'round' },
+          isFinalRound(n)
+            ? 'Last call: each side will take any rate it can live with.'
+            : `Round ${n.history.length + 1} of ${MAX_ROUNDS}`,
+        ),
+      );
+      const input = el('input', {
+        id: `rate-${c.id}`,
+        type: 'number',
+        min: '0',
+        step: '0.05',
+        'aria-label': `Proposed rate for ${c.id} in dollars per tonne`,
+      });
+      input.value = draftRates.get(c.id) ?? ((n.ownerOffer + n.chartererBid) / 2).toFixed(2);
+      input.addEventListener('input', () => draftRates.set(c.id, input.value));
+      const send = el('button', { type: 'submit' }, 'Send proposal');
+      const form = el('form', { class: 'propose' }, input, send);
+      form.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const rate = input.valueAsNumber;
+        if (!Number.isFinite(rate) || rate <= 0) return;
+        draftRates.delete(c.id);
+        act(sendProposal(selections, c.id, rate));
+      });
+      card.append(form);
+    } else if (n.status === 'agreed') {
+      card.append(el('p', { class: 'outcome good' }, `Fixed at ${formatRate(n.agreedRate!)} in round ${n.history.length}`));
+    } else {
+      card.append(el('p', { class: 'outcome bad' }, `No deal: talks ended after ${MAX_ROUNDS} rounds.`));
+    }
+
+    if (n.history.length > 0) card.append(historyList(n.history));
+    if (result) card.append(resultList(result));
+    return card;
+  }
+
+  render();
 }
 
 const whole = (n: number) => Math.round(n).toLocaleString('en-US');
 
-function refusal(status: 'refusedByOwner' | 'refusedByCharterer'): HTMLElement {
-  return status === 'refusedByOwner'
-    ? el('span', { class: 'refused', title: 'The owner would earn too little on this voyage.' }, 'Owner refuses')
-    : el('span', { class: 'refused', title: 'The charterer won’t pay this much.' }, 'Charterer refuses');
+function historyList(history: readonly NegotiationRound[]): HTMLElement {
+  const reply = (accepted: boolean, side: string, position: number) =>
+    accepted ? `${side} accepts` : `${side} counters ${formatRate(position)}`;
+  return el(
+    'ol',
+    { class: 'history' },
+    ...history.map((r) =>
+      el(
+        'li',
+        {},
+        `You proposed ${formatRate(r.proposedRate)}: `,
+        reply(r.ownerAccepted, 'owner', r.ownerOffer),
+        ', ',
+        reply(r.chartererAccepted, 'charterer', r.chartererBid),
+      ),
+    ),
+  );
 }
 
-function fillResult(market: DailyMarket, cells: HTMLTableCellElement[], r: FixtureResult | null): void {
-  if (!r) {
-    for (const cell of cells) cell.replaceChildren('–');
-    return;
-  }
-  const v = r.voyage;
-  const ship = market.ships.find((s) => s.id === r.fixture.shipId)!;
-  const cargo = market.cargoes.find((c) => c.id === r.fixture.cargoId)!;
-  const values: (Node | string)[] = [
-    formatNm(distanceNm(ship.openPort, cargo.loadPort)),
-    formatDays(v.totalDays),
-    formatUsdPerDay(v.tceUsdPerDay),
-    satisfactionBadge(r.ownerSatisfaction),
-    satisfactionBadge(r.chartererSatisfaction),
-    formatUsd(r.brokerageUsd),
-    r.status === 'fixed' ? whole(r.score) : refusal(r.status),
-  ];
-  cells.forEach((cell, i) => cell.replaceChildren(values[i]!));
+function resultList(r: FixtureResult): HTMLElement {
+  const row = (label: Node | string, value: Node | string) => [el('dt', {}, label), el('dd', {}, value)];
+  return el(
+    'dl',
+    { class: 'results' },
+    ...row(term('Owner TCE', HINTS.tce), formatUsdPerDay(r.voyage.tceUsdPerDay)),
+    ...row(term('Owner', HINTS.owner), satisfactionBadge(r.ownerSatisfaction)),
+    ...row(term('Charterer', HINTS.charterer), satisfactionBadge(r.chartererSatisfaction)),
+    ...row(term('Brokerage', HINTS.brokerage), formatUsd(r.brokerageUsd)),
+    ...row(term('Score', HINTS.score), whole(r.score)),
+  );
 }

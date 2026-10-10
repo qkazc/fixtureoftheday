@@ -52,11 +52,27 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .scroll { overflow-x: auto; }
 abbr[title] { text-decoration: underline dotted; cursor: help; }
 select, input { font: inherit; padding: 2px 4px; }
-select { width: 100%; min-width: 16em; }
+select { width: 100%; }
 input[type='number'] { width: 6.5em; }
 .badge { display: inline-block; min-width: 2.2em; text-align: center; border-radius: 4px; font-weight: 600; }
 .badge.good { color: var(--good); }
 .badge.ok { color: var(--ok); }
 .badge.bad { color: var(--bad); }
-.refused { color: var(--bad); font-weight: 600; }
+h3 { margin: 0; font-size: 1rem; }
+.desk { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); }
+.card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.card p { margin: 0; }
+.hint { color: var(--muted); }
+.positions { font-variant-numeric: tabular-nums; }
+.round { color: var(--muted); font-size: 0.9rem; }
+.round.last { color: var(--ok); font-weight: 600; }
+.propose { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; padding: 2px 10px; cursor: pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+.outcome { font-weight: 600; }
+.outcome.good { color: var(--good); }
+.outcome.bad { color: var(--bad); }
+.history { margin: 0; padding-left: 1.4em; color: var(--muted); font-size: 0.9rem; }
+.results { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-variant-numeric: tabular-nums; }
+.results dd { margin: 0; text-align: right; }
 .totals { margin-top: 1rem; font-size: 1.1rem; }
