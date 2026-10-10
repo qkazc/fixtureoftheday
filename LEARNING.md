@@ -31,6 +31,19 @@ Places where the game deliberately differs from reality, and why.
 - **Areas as ports.** "US Gulf" stands for many Mississippi River grain
   terminals, and Kamsar for the wider Guinea bauxite coast.
 
+### Daily market (`engine/market.ts`, `engine/vessels.ts`)
+- **No dates or laycans.** Every ship is ready now. Real ships open on a
+  given date, and cargoes have a laycan window the ship must arrive in.
+- **One class per trade.** Each cargo needs exactly its trade's class. In
+  reality a bigger ship can take a smaller cargo (usually at a worse rate),
+  and cargo sizes are quoted with a tolerance such as "10% more or less".
+- **Identical sister ships.** All ships of a class share the same specs,
+  port days and port costs.
+- **Market rates come from a target TCE.** Each class has a daily figure
+  "the market pays". A cargo's rate is whatever gives a ship already at the
+  load port that figure (±10%). Real rates come from supply and demand on
+  each route, so this only approximates them.
+
 ## Placeholder numbers
 
 Values we made up or estimated roughly, to replace with better-sourced
@@ -45,6 +58,11 @@ figures later.
 - **Port distances** (`engine/ports.ts`): game estimates, approximate,
   rounded to the nearest 50 nm. Plausible for the usual routes but not from
   official distance tables.
+- **Ship classes** (`engine/vessels.ts`): DWT, speed, fuel burn, opex,
+  cargo ranges, port days and costs, and market TCE (Supramax $13,000,
+  Panamax $14,000, Capesize $20,000 a day). Plausible, hand-picked.
+- **Market** (`engine/market.ts`): bunkers $550–650/t, 5% commission, ±10%
+  rate noise. Hand-picked.
 
 ## Notes
 
