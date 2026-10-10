@@ -3,3 +3,70 @@
 Shipping terms used in the game, in plain English. Kept in alphabetical order.
 
 <!-- Add entries as: **Term**: one or two plain sentences. -->
+
+**Address commission**: A percentage of the freight that the shipowner pays
+back to the charterer. It's essentially a discount dressed up as a commission
+and is often around 2.5–3.75%.
+
+**Ballast leg**: The part of a voyage where the ship sails empty, usually from
+where it finished its last job to the port where it will load the next cargo.
+The owner pays for this leg but earns nothing on it.
+
+**Brokerage**: The commission a shipbroker earns for arranging a deal,
+usually paid by the shipowner as a percentage of the freight (often around
+1.25% per broker). In this game, this is your income.
+
+**Bunkers**: Ship's fuel. The name dates from the coal bunkers that steamships
+stored their fuel in. Bunker costs are usually the biggest single voyage
+expense.
+
+**Charterer**: The party who hires a ship. In dry bulk this is usually the
+cargo owner, or a trader shipping cargo on someone else's behalf.
+
+**Deadweight (DWT)**: The total weight in tonnes a ship can carry: cargo plus
+fuel, fresh water, stores and crew. Because fuel and stores take up some of
+it, the cargo a ship can actually lift is always a bit less than its DWT.
+
+**Dry bulk**: Unpackaged cargo loaded loose into a ship's holds, such as iron
+ore, coal, grain, bauxite or fertiliser.
+
+**Freight**: The money a charterer pays the shipowner for carrying a cargo.
+In dry bulk it is usually quoted in US dollars per tonne of cargo.
+
+**Knot**: A speed of one nautical mile per hour. A ship doing 13 knots covers
+13 × 24 = 312 nautical miles a day.
+
+**Laden leg**: The part of a voyage where the ship is carrying cargo, from the
+load port to the discharge port.
+
+**Nautical mile (nm)**: The distance unit used at sea, equal to 1,852 metres
+(about 1.15 ordinary miles).
+
+**Opex (operating expenses)**: What it costs every day just to own and run the
+ship, whether or not it is working: crew wages, insurance, maintenance,
+spares, stores. Opex is not a voyage cost.
+
+**Port costs (port disbursements)**: Fees paid at each port call: harbour
+dues, pilots, tugs, berth fees, agency fees. On a voyage charter the shipowner
+usually pays these.
+
+**Shipbroker**: An intermediary who matches ships with cargoes and negotiates
+the deal between owner and charterer, earning a commission on the freight.
+
+**Shipowner**: The company that owns (or controls) a ship and offers it for
+hire.
+
+**TCE (Time Charter Equivalent)**: A voyage's earnings converted into dollars
+per day: (freight − voyage costs) ÷ voyage days. It lets an owner compare a
+voyage-charter offer with a time-charter offer that pays a daily rate.
+
+**Time charter**: A contract where the charterer hires the ship for a period
+of time and pays a daily rate (called "hire"). The charterer pays for fuel
+and port costs; the owner still pays opex.
+
+**Voyage charter**: A contract to carry one specific cargo from A to B for a
+freight rate per tonne. The owner pays fuel and port costs out of that freight.
+
+**Voyage costs**: Costs that exist only because of a particular voyage: mainly
+bunkers, port costs and commissions. Different from opex, which the owner pays
+regardless.
