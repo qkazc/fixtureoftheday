@@ -23,6 +23,7 @@ import {
   type Inbox,
 } from '../engine';
 import { formatClass, formatCommodity, formatNm, formatUsd, formatUsdPerDay } from './format';
+import { drawMap } from './mapView';
 import {
   blockMessage,
   cargoLabel,
@@ -130,9 +131,20 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
     );
   }
 
-  /** Placeholder until the map lands in the next step. */
   function mapView(): HTMLElement {
-    return el('p', { class: 'muted' }, 'Map: ports and ships.');
+    const open = openId ? inbox.emails.find((e) => e.id === openId) : undefined;
+    const cargo =
+      started && open?.kind === 'enquiry' ? inbox.market.cargoes.find((c) => c.id === open.cargoId)! : null;
+    const legend = cargo
+      ? el(
+          'p',
+          { class: 'legend' },
+          el('span', { class: 'key voyage' }, '━ voyage'),
+          el('span', { class: 'key ballast' }, '┅ ballast, can make laycan'),
+          el('span', { class: 'key late' }, '┅ too late for laycan'),
+        )
+      : el('p', { class: 'legend muted' }, started ? 'Open an enquiry to see its voyage and the ships that could take it.' : '▲ ship · open date');
+    return el('div', {}, drawMap(inbox, { cargo, fixedShipIds: new Set(day.fixtures.map((f) => f.shipId)) }), legend);
   }
 
   function newsList(): HTMLElement {

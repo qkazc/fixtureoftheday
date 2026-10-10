@@ -126,3 +126,25 @@ td.num { text-align: right; }
 .down { color: var(--bad); }
 
 [role='status'] { color: var(--accent); }
+
+/* Map */
+.map { display: block; width: 100%; height: auto; }
+.map .sea { fill: var(--sea); }
+.map .land { fill: var(--land); stroke: var(--coast); stroke-width: 0.3; }
+.map .port { fill: var(--muted); }
+.map .port.focus { fill: var(--accent); }
+.map text { font-family: var(--mono); font-size: 3.4px; fill: var(--muted); }
+.map .port-label.focus { fill: var(--accent); font-weight: 700; }
+.map .ship path { fill: var(--fg); }
+.map .ship text { fill: var(--fg); font-size: 3px; }
+.map .ship.faded { opacity: 0.3; }
+.map .ship.fixed path, .map .ship.fixed text { fill: var(--good); }
+.map line { vector-effect: non-scaling-stroke; }
+.map .voyage { stroke: var(--route); stroke-width: 2.5; }
+.map .ballast { stroke: var(--ballast); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.map .ballast.late { stroke: var(--muted); opacity: 0.6; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; margin: 6px 0 0; }
+.key.voyage { color: var(--route); }
+.key.ballast { color: var(--ballast); }
+.key.late { color: var(--muted); }
+

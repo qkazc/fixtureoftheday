@@ -87,6 +87,15 @@ Places where the game deliberately differs from reality, and why.
   only because bunker prices change. Real indices move with supply and
   demand: ships, cargoes, weather, congestion and sentiment.
 
+### The desk map (`src/mapData.ts`, `src/mapGeometry.ts`)
+- **Hand-drawn, low-poly world.** Continents are a few dozen points each,
+  and ports are placed by rough coordinates.
+- **Straight lines, not routes.** Voyage and ballast lines go straight from
+  port to port (wrapping across the Pacific where that's shorter). Real
+  ships follow sea lanes round capes and through canals, so a line from
+  Santos to Qingdao crosses Africa on the map while the ship would sail
+  round the Cape of Good Hope.
+
 ## Placeholder numbers
 
 Values we made up or estimated roughly, to replace with better-sourced
@@ -122,6 +131,8 @@ figures later.
 - **Morning brief** (`engine/briefing.ts`): 3-4 news lines (always the
   contest, plus 2-3 of the others); indicative rates use a mid-size cargo
   and the 2,000 nm typical ballast leg.
+- **Map geography** (`src/mapData.ts`): hand-drawn continent outlines and
+  approximate port coordinates.
 
 ## Notes
 
