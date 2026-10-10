@@ -29,6 +29,10 @@ are placeholders.
 3. **End of day**: what you fixed and why it scored what it did, what you
    missed and which ship could have fixed it.
 
+You get one attempt per day. Progress is saved in your browser (so a refresh
+doesn't lose it, but it doesn't follow you to another device), and the end
+of day gives a spoiler-free result to copy and share.
+
 ## Running it
 
 Requires Node 22 or later.
@@ -66,7 +70,8 @@ build on GitHub Actions (`.github/workflows/ci.yml`).
   - `random.ts`: the seeded random number generator
 - `src/`: the browser UI, in plain TypeScript and DOM with no framework.
   `view.ts` draws the screens, and `text.ts` builds the plain-language
-  sentences (tested).
+  sentences (tested). `save.ts` keeps the day in local storage by saving the
+  player's actions and replaying them; `share.ts` builds the result text.
 - `scripts/build-page.mjs`: packs the build into one self-contained page.
 
 [`CLAUDE.md`](CLAUDE.md) holds the working rules for the project.

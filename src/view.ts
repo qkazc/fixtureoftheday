@@ -3,27 +3,33 @@
 // All rules live in engine/day.ts; this file only shows state and calls it.
 
 import {
-  attemptFix,
   calendarDay,
   DISTRACTION_PAYOUT_USD,
-  endDay,
   enquiryStatus,
   generateBriefing,
-  handleDistraction,
   hoursLeft,
-  research,
   startDay,
   summarizeDay,
   PORTS,
-  type BlockReason,
   type DayState,
   type EnquiryEmail,
+  type FixOutcome,
   type Inbox,
 } from '../engine';
 import { compactUsd, formatClass, formatCommodity, formatNm, formatUsd } from './format';
 import { matchRows, type BoardCell } from './board';
 import { inboxRows } from './inboxRows';
 import { drawMap } from './mapView';
+import {
+  applyAction,
+  browserStorage,
+  loadDay,
+  saveDay,
+  type ActionOutcome,
+  type SavedAction,
+  type StorageLike,
+} from './save';
+import { shareText } from './share';
 import {
   blockMessage,
   cargoLabel,
@@ -66,12 +72,16 @@ function pane(title: string, area: string, ...content: (Node | string)[]): HTMLE
   );
 }
 
-export function renderGame(root: HTMLElement, inbox: Inbox): void {
-  let day: DayState = startDay();
+export function renderGame(root: HTMLElement, inbox: Inbox, store: StorageLike | null = browserStorage()): void {
+  // Pick up where the player left off today, if this browser saved the day.
+  const saved = loadDay(store, inbox);
+  let day: DayState = saved?.day ?? startDay();
   /** The morning brief comes first; the inbox opens when the day starts. */
-  let started = false;
+  let started = saved?.started ?? false;
   let openId: string | null = null;
-  const read = new Set<string>();
+  const read = new Set<string>(saved?.read ?? []);
+  /** Every action taken today, in order: what gets saved and replayed. */
+  const actions: SavedAction[] = [...(saved?.actions ?? [])];
   /** Last message shown under each email (the result of its last action). */
   const messages = new Map<string, string>();
   const shipChoice = new Map<string, string>();
@@ -79,17 +89,21 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
   let boardTab: 'positions' | 'index' = 'positions';
   const rateChoice = new Map<string, string>();
 
-  function apply(emailId: string, result: { ok: true; state: DayState } | { ok: false; reason: BlockReason }, okText: string): void {
-    if (result.ok) {
-      day = result.state;
-      messages.set(emailId, okText);
-    } else {
-      messages.set(emailId, blockMessage(result.reason));
+  /** Runs an action through the engine, records it for saving, and shows its message. */
+  function perform(emailId: string | null, action: SavedAction, okText: (outcome: ActionOutcome) => string): void {
+    const r = applyAction(inbox, day, action);
+    if (r.ok) {
+      day = r.state;
+      actions.push(action);
+      if (emailId) messages.set(emailId, okText(r.outcome));
+    } else if (emailId) {
+      messages.set(emailId, blockMessage(r.reason));
     }
     render();
   }
 
   function render(): void {
+    saveDay(store, { date: inbox.date, started, read: [...read], actions });
     const screen = !started ? 'brief' : day.ended ? 'summary' : 'day';
     const panes =
       screen === 'brief'
@@ -121,7 +135,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
       screen === 'brief'
         ? button('Start the day (09:00)', () => ((started = true), render()), { class: 'primary' })
         : screen === 'day'
-          ? button('End day', () => ((day = endDay(day)), render()))
+          ? button('End day', () => perform(null, { kind: 'endDay' }, () => ''))
           : '';
     return el(
       'header',
@@ -310,7 +324,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
           'p',
           {},
           button(`Handle it (${hoursLabel(e.effortHours)})`, () =>
-            apply(e.id, handleDistraction(inbox, day, e.id), `Handled. ${formatUsd(e.payoutUsd)} commission.`),
+            perform(e.id, { kind: 'distraction', emailId: e.id }, () => `Handled. ${formatUsd(e.payoutUsd)} commission.`),
           ),
         ),
       );
@@ -338,7 +352,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
         el(
           'p',
           {},
-          button(`Research voyage estimates (${hoursLabel(0.5)})`, () => apply(e.id, research(inbox, day, e.id), 'Estimates ready.')),
+          button(`Research voyage estimates (${hoursLabel(0.5)})`, () => perform(e.id, { kind: 'research', emailId: e.id }, () => 'Estimates ready.')),
         ),
       );
     }
@@ -379,8 +393,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
         return;
       }
       const rate = Number(slider.value);
-      const r = attemptFix(inbox, day, e.id, shipId, rate);
-      apply(e.id, r, r.ok ? fixOutcomeMessage(r.outcome, rate) : '');
+      perform(e.id, { kind: 'fix', emailId: e.id, shipId, rateUsdPerTonne: rate }, (o) => fixOutcomeMessage(o as FixOutcome, rate));
     });
 
     out.push(
@@ -392,6 +405,37 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
     return out;
   }
 
+  /** The spoiler-free result, with a button to copy it for sharing. */
+  function shareBox(summary: ReturnType<typeof summarizeDay>): HTMLElement {
+    const text = shareText(inbox, summary);
+    const pre = el('pre', { class: 'share', id: 'share-text' }, text);
+    const status = el('span', { class: 'muted', role: 'status' });
+    const selectText = () => {
+      const range = document.createRange();
+      range.selectNodeContents(pre);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    };
+    const fallback = () => {
+      selectText();
+      status.textContent = 'Couldn’t copy automatically: the text is selected, so copy it yourself.';
+    };
+    const copy = button('Copy result', () => {
+      // Use the clipboard inside the click; if it's missing or refused, select the text instead.
+      if (!navigator.clipboard) return fallback();
+      navigator.clipboard.writeText(text).then(() => (status.textContent = 'Copied. Paste it anywhere to share.'), fallback);
+    }, { class: 'primary' });
+    return el(
+      'div',
+      { class: 'share-box' },
+      el('h3', {}, 'Your result'),
+      pre,
+      el('p', {}, copy, ' ', status),
+      el('p', { class: 'muted' }, 'One attempt per day: come back tomorrow for a new market.'),
+    );
+  }
+
   function summaryView(): HTMLElement {
     const s = summarizeDay(inbox, day);
     const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v)}/100`);
@@ -401,6 +445,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
     return el(
       'div',
       {},
+      shareBox(s),
       ...endOfDayText(s, cargoOf).map((line) => el('p', {}, line)),
       el(
         'ul',

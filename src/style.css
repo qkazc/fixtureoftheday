@@ -204,3 +204,7 @@ button.tab.active { border-color: var(--accent); color: var(--accent); }
 .tce.ok { color: var(--ok); }
 .tce.bad, .late { color: var(--bad); }
 
+/* End-of-day share box */
+.share-box { margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+pre.share { display: inline-block; min-width: min(100%, 26em); color: var(--fg); }
+
