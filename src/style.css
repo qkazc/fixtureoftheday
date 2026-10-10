@@ -75,4 +75,19 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .history { margin: 0; padding-left: 1.4em; color: var(--muted); font-size: 0.9rem; }
 .results { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-variant-numeric: tabular-nums; }
 .results dd { margin: 0; text-align: right; }
+.board th, .board td { vertical-align: top; }
+.board .sub { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+.cell { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); text-align: left; font-variant-numeric: tabular-nums; }
+.cell .tce { font-weight: 600; }
+.cell.good .tce { color: var(--good); }
+.cell.ok .tce { color: var(--ok); }
+.cell.bad .tce { color: var(--bad); }
+.cell .status { font-size: 0.8rem; font-weight: 600; min-height: 1.1em; }
+.cell.talking { border-color: var(--fg); border-width: 2px; }
+.cell.fixed { border-color: var(--good); border-width: 2px; }
+.cell.fixed .status { color: var(--good); }
+.cell.failed .status { color: var(--bad); }
+.cell:disabled { cursor: default; opacity: 0.55; }
+.cell.fixed:disabled, .cell.failed:disabled, .cell.talking:disabled { opacity: 1; }
+.cell.nofit { border: none; color: var(--muted); opacity: 0.6; padding-left: 8px; }
 .totals { margin-top: 1rem; font-size: 1.1rem; }

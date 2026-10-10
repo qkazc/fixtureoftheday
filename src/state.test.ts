@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateMarket, MAX_ROUNDS, type Negotiation } from '../engine';
 import {
   availableShips,
+  boardCell,
   chooseShip,
   evaluate,
   initialSelections,
@@ -80,3 +81,38 @@ describe('scoring', () => {
     expect(sendProposal(s, 'C4', 10)).toBe(s);
   });
 });
+
+describe('boardCell', () => {
+  it('marks wrong-class pairs as not fitting', () => {
+    const s = initialSelections(market);
+    const c = market.cargoes[0]!;
+    const wrong = market.ships.find((x) => x.vesselClass !== c.vesselClass)!;
+    const cell = boardCell(market, s, wrong.id, c.id);
+    expect(cell.fits).toBe(false);
+    expect(cell.estTceUsdPerDay).toBeNull();
+  });
+
+  it('estimates owner TCE at the market rate, best for a ship at the load port', () => {
+    const s = initialSelections(market);
+    const atPort = boardCell(market, s, 'S3', 'C4'); // S3 is at Tubarão
+    expect(atPort.ballastNm).toBe(0);
+    expect(atPort.estTceRatio).toBeGreaterThan(1);
+    const far = boardCell(market, s, 'S4', 'C4'); // S4 is at Qingdao
+    expect(far.estTceUsdPerDay!).toBeLessThan(atPort.estTceUsdPerDay!);
+  });
+
+  it('tracks talks: talking, busy elsewhere, fixed and failed', () => {
+    let s = chooseShip(market, initialSelections(market), 'C4', 'S3');
+    expect(boardCell(market, s, 'S3', 'C4').status).toBe('talking');
+    expect(boardCell(market, s, 'S3', 'C1').status).toBe('busy');
+    expect(boardCell(market, s, 'S2', 'C1').status).toBe('free');
+    s = closeDeal(s, 'C4');
+    expect(boardCell(market, s, 'S3', 'C4').status).toBe('fixed');
+
+    let f = chooseShip(market, initialSelections(market), 'C3', 'S4');
+    for (let i = 0; i < MAX_ROUNDS; i++) f = sendProposal(f, 'C3', 0.05);
+    expect(boardCell(market, f, 'S4', 'C3').status).toBe('failed');
+    expect(boardCell(market, f, 'S2', 'C3').status).toBe('busy'); // cargo C3 is lost for the day
+  });
+});
+

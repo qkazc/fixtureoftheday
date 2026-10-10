@@ -93,20 +93,7 @@ function scoreFixture(
   }
 
   const spec = VESSEL_CLASSES[ship.vesselClass];
-  const voyage = calculateVoyage(
-    spec.vessel,
-    {
-      quantityTonnes: cargo.quantityTonnes,
-      freightRateUsdPerTonne: fixture.rateUsdPerTonne,
-      commissionPct: MARKET_COMMISSION_PCT,
-    },
-    buildRoute(
-      { openPort: ship.openPort, loadPort: cargo.loadPort, dischargePort: cargo.dischargePort },
-      spec.portDays,
-      spec.portCostsUsd,
-    ),
-    { bunkerPriceUsdPerTonne: market.bunkerPriceUsdPerTonne },
-  );
+  const voyage = estimateVoyage(market, ship, cargo, fixture.rateUsdPerTonne);
 
   const ownerRatio = voyage.tceUsdPerDay / spec.marketTceUsdPerDay;
   const rateRatio = fixture.rateUsdPerTonne / cargo.marketRateUsdPerTonne;
@@ -125,6 +112,33 @@ function scoreFixture(
   const score = brokerageUsd * ((ownerSatisfaction + chartererSatisfaction) / 100);
 
   return { fixture, status, voyage, brokerageUsd, ownerSatisfaction, chartererSatisfaction, score };
+}
+
+/**
+ * A voyage estimate: the voyage for this ship and cargo at a given rate,
+ * including the ship's ballast leg from where it is open.
+ */
+export function estimateVoyage(
+  market: DailyMarket,
+  ship: ShipOffer,
+  cargo: CargoOrder,
+  rateUsdPerTonne: number,
+): VoyageResult {
+  const spec = VESSEL_CLASSES[ship.vesselClass];
+  return calculateVoyage(
+    spec.vessel,
+    {
+      quantityTonnes: cargo.quantityTonnes,
+      freightRateUsdPerTonne: rateUsdPerTonne,
+      commissionPct: MARKET_COMMISSION_PCT,
+    },
+    buildRoute(
+      { openPort: ship.openPort, loadPort: cargo.loadPort, dischargePort: cargo.dischargePort },
+      spec.portDays,
+      spec.portCostsUsd,
+    ),
+    { bunkerPriceUsdPerTonne: market.bunkerPriceUsdPerTonne },
+  );
 }
 
 function findById<T extends { id: string }>(items: readonly T[], id: string, kind: string): T {

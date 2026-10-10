@@ -3,6 +3,7 @@
 
 import {
   distanceNm,
+  estimateVoyage,
   propose,
   scoreDay,
   startNegotiation,
@@ -90,6 +91,52 @@ export function voyageOutline(
   const ballastNm = distanceNm(ship.openPort, cargo.loadPort);
   const seaNm = ballastNm + distanceNm(cargo.loadPort, cargo.dischargePort);
   return { ballastNm, days: seaNm / (spec.vessel.speedKnots * 24) + spec.portDays };
+}
+
+export type CellStatus = 'free' | 'talking' | 'fixed' | 'failed' | 'busy';
+
+export interface BoardCell {
+  /** False when the ship is the wrong class for the cargo. */
+  fits: boolean;
+  ballastNm: number;
+  /** Owner's TCE if the cargo went at its market rate (a quick voyage estimate); null if it doesn't fit. */
+  estTceUsdPerDay: number | null;
+  /** estTce as a share of the class market TCE (1 = exactly market); null if it doesn't fit. */
+  estTceRatio: number | null;
+  /** What's happening with this ship-cargo pair right now. */
+  status: CellStatus;
+}
+
+/** One cell of the market board: a ship (row) against a cargo (column). */
+export function boardCell(
+  market: DailyMarket,
+  selections: Selections,
+  shipId: string,
+  cargoId: string,
+): BoardCell {
+  const ship = market.ships.find((s) => s.id === shipId)!;
+  const cargo = market.cargoes.find((c) => c.id === cargoId)!;
+  const ballastNm = distanceNm(ship.openPort, cargo.loadPort);
+  const fits = ship.vesselClass === cargo.vesselClass;
+  const estTce = fits ? estimateVoyage(market, ship, cargo, cargo.marketRateUsdPerTonne).tceUsdPerDay : null;
+  const sel = selections[cargoId];
+  const here = sel?.shipId === shipId ? sel.negotiation?.status : undefined;
+  const busyElsewhere = Object.entries(selections).some(
+    ([id, s]) => id !== cargoId && s.shipId === shipId && isBusy(s),
+  );
+  const status: CellStatus =
+    here === 'agreed' ? 'fixed'
+    : here === 'failed' ? 'failed'
+    : here === 'open' ? 'talking'
+    : busyElsewhere || isLocked(sel ?? { shipId: null, negotiation: null }) ? 'busy'
+    : 'free';
+  return {
+    fits,
+    ballastNm,
+    estTceUsdPerDay: estTce,
+    estTceRatio: estTce === null ? null : estTce / VESSEL_CLASSES[ship.vesselClass].marketTceUsdPerDay,
+    status,
+  };
 }
 
 /** Fixtures for every cargo whose talks ended in agreement. */

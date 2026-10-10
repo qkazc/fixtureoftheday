@@ -1,9 +1,8 @@
-// Renders the day's market and the fixture builder. The static parts are
-// built once; on each change only the dropdowns, results and totals update,
-// so typing in a rate box never loses focus.
+// Renders the day: the market board (ships against cargoes) on top, the deal
+// desk (one card per cargo, with its negotiation) underneath. Everything is
+// re-rendered after each action; typing in a rate box doesn't trigger a render.
 
 import {
-  distanceNm,
   isFinalRound,
   MAX_ROUNDS,
   PORTS,
@@ -11,6 +10,7 @@ import {
   type DailyMarket,
   type FixtureResult,
   type NegotiationRound,
+  type ShipOffer,
 } from '../engine';
 import {
   formatClass,
@@ -23,21 +23,24 @@ import {
   formatUsdPerDay,
 } from './format';
 import {
-  availableShips,
+  boardCell,
   chooseShip,
   evaluate,
   initialSelections,
   isLocked,
   sendProposal,
   voyageOutline,
+  type BoardCell,
   type Selection,
   type Selections,
 } from './state';
 
 // Short definitions shown on hover. Fuller ones live in GLOSSARY.md.
 const HINTS = {
+  board: 'Market board: each cell is a quick voyage estimate for that ship carrying that cargo at the market rate.',
   ballast: 'Ballast leg: sailing empty from where the ship is free to the load port. The owner pays for it but earns nothing.',
   tce: 'TCE (Time Charter Equivalent): (freight − fuel, port costs and commissions) ÷ voyage days.',
+  estTce: 'Estimated owner TCE if the cargo went at its market rate. Green beats the class market, amber is within 20% below, red is worse.',
   brokerage: 'Brokerage: your commission, 1.25% of the gross freight.',
   marketRate: 'The going freight rate for this cargo, in US dollars per tonne.',
   open: 'Open position: the port where the ship becomes free for its next job.',
@@ -64,27 +67,29 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const term = (label: string, hint: string) => el('abbr', { title: hint }, label);
 const portName = (id: keyof typeof PORTS) => PORTS[id].name;
-
-/** A simple table, wrapped so it scrolls sideways on narrow screens. */
-function table(headers: (Node | string)[], rows: (Node | string)[][]): HTMLElement {
-  return el(
-    'div',
-    { class: 'scroll' },
-    el(
-      'table',
-      {},
-      el('thead', {}, el('tr', {}, ...headers.map((h) => el('th', {}, h)))),
-      el('tbody', {}, ...rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))))),
-    ),
-  );
-}
+const whole = (n: number) => Math.round(n).toLocaleString('en-US');
 
 function satisfactionBadge(value: number): HTMLElement {
   const level = value >= 50 ? 'good' : value >= 25 ? 'ok' : 'bad';
   return el('span', { class: `badge ${level}` }, String(Math.round(value)));
 }
 
+const STATUS_LABELS: Record<BoardCell['status'], string> = {
+  free: '',
+  talking: 'In talks',
+  fixed: 'Fixed',
+  failed: 'No deal',
+  busy: '',
+};
+
 export function renderGame(root: HTMLElement, market: DailyMarket): void {
+  let selections: Selections = initialSelections(market);
+  const draftRates = new Map<string, string>();
+
+  const board = el('div', { class: 'scroll' });
+  const desk = el('div', { class: 'desk' });
+  const totals = el('p', { class: 'totals' });
+
   root.replaceChildren(
     el(
       'header',
@@ -98,33 +103,13 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
         ` ${formatUsd(market.bunkerPriceUsdPerTonne)}/t`,
       ),
     ),
+    el('h2', {}, term('Market board', HINTS.board)),
+    el('p', { class: 'hint' }, 'Pick a cell to open talks for that ship and cargo.'),
+    board,
+    el('h2', {}, 'Deal desk'),
+    desk,
+    totals,
   );
-
-  root.append(
-    el('h2', {}, 'Cargoes'),
-    table(
-      ['ID', 'Cargo', 'Route', 'Needs', term('Market rate', HINTS.marketRate)],
-      market.cargoes.map((c) => [
-        c.id,
-        `${formatTonnes(c.quantityTonnes)} ${formatCommodity(c.commodity).toLowerCase()}`,
-        `${portName(c.loadPort)} → ${portName(c.dischargePort)}`,
-        formatClass(c.vesselClass),
-        formatRate(c.marketRateUsdPerTonne),
-      ]),
-    ),
-    el('h2', {}, 'Ships'),
-    table(
-      ['ID', 'Name', 'Class', term('Open at', HINTS.open)],
-      market.ships.map((s) => [s.id, s.name, formatClass(s.vesselClass), portName(s.openPort)]),
-    ),
-  );
-
-  // Deal desk: one card per cargo with the ship choice and the negotiation.
-  let selections: Selections = initialSelections(market);
-  const draftRates = new Map<string, string>();
-  const desk = el('div', { class: 'desk' });
-  const totals = el('p', { class: 'totals' });
-  root.append(el('h2', {}, 'Deal desk'), desk, totals);
 
   function act(next: Selections): void {
     selections = next;
@@ -132,6 +117,7 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
   }
 
   function render(): void {
+    board.replaceChildren(marketBoard());
     const e = evaluate(market, selections);
     desk.replaceChildren(
       ...market.cargoes.map((c) => dealCard(c, selections[c.id]!, e.byCargo[c.id] ?? null)),
@@ -142,6 +128,70 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
       ' · Day score ',
       el('strong', {}, whole(e.totalScore)),
     );
+  }
+
+  function marketBoard(): HTMLTableElement {
+    const head = el(
+      'tr',
+      {},
+      el('th', {}, 'Ship', el('br'), el('span', { class: 'sub' }, term('Open at', HINTS.open))),
+      ...market.cargoes.map((c) =>
+        el(
+          'th',
+          { scope: 'col' },
+          `${c.id} · ${formatClass(c.vesselClass)}`,
+          el('br'),
+          el('span', { class: 'sub' }, `${formatTonnes(c.quantityTonnes)} ${formatCommodity(c.commodity).toLowerCase()}`),
+          el('br'),
+          el('span', { class: 'sub' }, `${portName(c.loadPort)} → ${portName(c.dischargePort)}`),
+          el('br'),
+          el('span', { class: 'sub' }, term('Market', HINTS.marketRate), ` ${formatRate(c.marketRateUsdPerTonne)}`),
+        ),
+      ),
+    );
+    const rows = market.ships.map((ship) =>
+      el(
+        'tr',
+        {},
+        el(
+          'th',
+          { scope: 'row' },
+          ship.name,
+          el('br'),
+          el('span', { class: 'sub' }, `${formatClass(ship.vesselClass)} · ${portName(ship.openPort)}`),
+        ),
+        ...market.cargoes.map((c) => el('td', {}, boardButton(ship, c))),
+      ),
+    );
+    return el('table', { class: 'board' }, el('thead', {}, head), el('tbody', {}, ...rows));
+  }
+
+  function boardButton(ship: ShipOffer, cargo: CargoOrder): HTMLElement {
+    const cell = boardCell(market, selections, ship.id, cargo.id);
+    if (!cell.fits) {
+      return el('span', { class: 'cell nofit', title: `${ship.name} is the wrong size for ${cargo.id}` }, '—');
+    }
+    const level = cell.estTceRatio! >= 1 ? 'good' : cell.estTceRatio! >= 0.8 ? 'ok' : 'bad';
+    const button = el(
+      'button',
+      {
+        type: 'button',
+        class: `cell ${level} ${cell.status}`,
+        'aria-label': `${ship.name} for ${cargo.id}: ${formatNm(cell.ballastNm)} ballast, estimated ${formatUsdPerDay(cell.estTceUsdPerDay!)}`,
+        title: HINTS.estTce,
+      },
+      el('span', {}, formatNm(cell.ballastNm)),
+      el('span', { class: 'tce' }, formatUsdPerDay(cell.estTceUsdPerDay!)),
+      el('span', { class: 'status' }, STATUS_LABELS[cell.status]),
+    );
+    const sel = selections[cargo.id]!;
+    button.disabled = cell.status === 'busy' || isLocked(sel) || sel.negotiation?.status === 'failed';
+    button.addEventListener('click', () => {
+      // Clicking the cell in talks again releases the ship (before any proposal).
+      const next = sel.shipId === ship.id ? null : ship.id;
+      act(chooseShip(market, selections, cargo.id, next));
+    });
+    return button;
   }
 
   function dealCard(c: CargoOrder, sel: Selection, result: FixtureResult | null): HTMLElement {
@@ -156,27 +206,16 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
       ),
     );
 
-    // Ship choice, with each ship's empty-sail distance to the load port.
-    const select = el('select', { id: `ship-${c.id}`, 'aria-label': `Ship for ${c.id}` });
-    select.append(
-      el('option', { value: '' }, '— choose a ship —'),
-      ...availableShips(market, selections, c.id).map((s) =>
-        el('option', { value: s.id }, `${s.name}, open ${portName(s.openPort)}, ${formatNm(distanceNm(s.openPort, c.loadPort))} away`),
-      ),
-    );
-    select.value = sel.shipId ?? '';
-    select.disabled = isLocked(sel);
-    select.addEventListener('change', () => act(chooseShip(market, selections, c.id, select.value || null)));
-    card.append(select);
-
     const n = sel.negotiation;
     if (!sel.shipId || !n) {
-      card.append(el('p', { class: 'hint' }, 'Choose a ship to open talks with its owner and the charterer.'));
+      card.append(el('p', { class: 'hint' }, 'Pick a ship for this cargo on the market board.'));
       return card;
     }
 
+    const ship = market.ships.find((s) => s.id === sel.shipId)!;
     const outline = voyageOutline(market, sel.shipId, c.id);
     card.append(
+      el('p', {}, el('strong', {}, ship.name), `, open ${portName(ship.openPort)}`),
       el('p', { class: 'meta' }, term('Ballast', HINTS.ballast), ` ${formatNm(outline.ballastNm)} · about ${formatDays(outline.days)}`),
     );
 
@@ -229,8 +268,6 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
 
   render();
 }
-
-const whole = (n: number) => Math.round(n).toLocaleString('en-US');
 
 function historyList(history: readonly NegotiationRound[]): HTMLElement {
   const reply = (accepted: boolean, side: string, position: number) =>
