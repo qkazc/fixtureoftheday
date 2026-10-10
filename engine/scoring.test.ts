@@ -12,15 +12,22 @@ const coalTrade: Trade = {
   vesselClass: 'supramax',
 };
 const marketRate = rateForTce(coalTrade, 50_000, 600, VESSEL_CLASSES.supramax.marketTceUsdPerDay);
-const coal: CargoOrder = { ...coalTrade, id: 'C1', quantityTonnes: 50_000, marketRateUsdPerTonne: marketRate };
+const coal: CargoOrder = {
+  ...coalTrade,
+  id: 'C1',
+  quantityTonnes: 50_000,
+  marketRateUsdPerTonne: marketRate,
+  laycanStartDay: 5,
+  laycanEndDay: 8,
+};
 const market: DailyMarket = {
   date: '2026-10-10',
   bunkerPriceUsdPerTonne: 600,
   cargoes: [coal],
   ships: [
-    { id: 'atLoadPort', name: 'Amber Tern', vesselClass: 'supramax', openPort: 'richardsBay' },
-    { id: 'farAway', name: 'Blue Heron', vesselClass: 'supramax', openPort: 'qingdao' },
-    { id: 'cape', name: 'Cape Lark', vesselClass: 'capesize', openPort: 'richardsBay' },
+    { id: 'atLoadPort', name: 'Amber Tern', vesselClass: 'supramax', openPort: 'richardsBay', openDay: 0, dwt: 58_000 },
+    { id: 'farAway', name: 'Blue Heron', vesselClass: 'supramax', openPort: 'qingdao', openDay: 0, dwt: 58_000 },
+    { id: 'cape', name: 'Cape Lark', vesselClass: 'capesize', openPort: 'richardsBay', openDay: 0, dwt: 180_000 },
   ],
 };
 

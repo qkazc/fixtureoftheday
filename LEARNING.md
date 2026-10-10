@@ -32,10 +32,12 @@ Places where the game deliberately differs from reality, and why.
   terminals, and Kamsar for the wider Guinea bauxite coast.
 
 ### Daily market (`engine/market.ts`, `engine/vessels.ts`)
-- **No dates or laycans.** Every ship is ready now. Real ships open on a
-  given date, and cargoes have a laycan window the ship must arrive in.
-- **A staged contest.** About 3 days in 4 include two same-size cargoes
-  loading near each other, plus one ship placed to suit both. Real markets
+- **Simple timing.** Ships open on a day 0-6 days from now, and a ship fits
+  a cargo if it can sail straight to the load port by the end of the
+  laycan. Arriving early is fine. Real laycans are tighter, and arriving
+  early can mean costly waiting or a cancelled booking.
+- **A staged contest.** Every day includes two same-size cargoes loading
+  near each other, plus one ship placed to suit both, and a decoy ship. Real markets
   produce this naturally: ships and cargoes cluster in the same regions
   (the Atlantic, the Pacific, the Indian Ocean), so brokers compete for the
   same well-placed ships every day.
@@ -75,6 +77,17 @@ Places where the game deliberately differs from reality, and why.
 - **Moods last a day.** Each owner's floor and charterer's ceiling come from
   the day's seed. Real clients remember how you treated them.
 
+### The broker's day (`engine/inbox.ts`, `engine/day.ts`)
+- **Only you move the clock.** Time passes only when you research, fix or
+  handle the distraction. Real days bring new emails, chasers and
+  cancellations as they go.
+- **One firm rate per attempt.** A fix closes if the rate is inside both
+  hidden limits. A refusal says who said no but not by how much. Real
+  fixtures are negotiated, then go "on subjects" (conditions to clear)
+  before they are final.
+- **Fixed effort by ship size.** Real effort depends on the client, the
+  cargo's complications, and how many people are chasing the same ship.
+
 ## Placeholder numbers
 
 Values we made up or estimated roughly, to replace with better-sourced
@@ -104,6 +117,12 @@ figures later.
   openings 10–35% away from each side's limit, concessions 35–65% of the gap
   per counter, 3 rounds, 8 proposals per day. `engine/balance.test.ts`
   checks that reading counters beats meeting in the middle.
+- **Inbox and day** (`engine/inbox.ts`, `engine/market.ts`): 8 working
+  hours (09:00-17:00); research 0.5 h; fixing takes 1 h (Supramax), 2 h
+  (Panamax) or 3 h (Capesize); deadlines 11:00, 13:00, 15:00 or 17:00; the
+  distraction takes 1 h, is due by 10:00 and pays $1,500; ships open 0-6
+  days out; laycans are 3 days wide and end 1-4 days after the matching
+  ship can arrive.
 
 ## Notes
 

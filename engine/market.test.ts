@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CARGOES_PER_DAY,
+  CARGOES_PER_DAY_RANGE,
+  fitCheck,
+  isWorkable,
   CHARTERER_CEILING_RANGE,
-  hasDealZone,
   negotiationLimits,
   OWNER_FLOOR_RANGE,
   generateMarket,
@@ -16,7 +17,6 @@ import {
   type ShipOffer,
 } from './market';
 import { distanceNm, PORTS } from './ports';
-import { estimateVoyage } from './scoring';
 import { VESSEL_CLASSES } from './vessels';
 import { calculateVoyage } from './voyage';
 
@@ -52,8 +52,14 @@ describe('generateMarket', () => {
 
   it.each(DATES)('builds a valid, solvable market for %s', (date) => {
     const m = generateMarket(date);
-    expect(m.cargoes).toHaveLength(CARGOES_PER_DAY);
-    expect(m.ships).toHaveLength(CARGOES_PER_DAY + 1);
+    expect(m.cargoes.length).toBeGreaterThanOrEqual(CARGOES_PER_DAY_RANGE[0]);
+    expect(m.cargoes.length).toBeLessThanOrEqual(CARGOES_PER_DAY_RANGE[1]);
+    // One ship per cargo, plus the shared contest ship and a decoy.
+    expect(m.ships).toHaveLength(m.cargoes.length + 2);
+    for (const c of m.cargoes) {
+      expect(c.laycanStartDay).toBeGreaterThanOrEqual(1);
+      expect(c.laycanEndDay).toBeGreaterThanOrEqual(c.laycanStartDay);
+    }
     expect(m.bunkerPriceUsdPerTonne).toBeGreaterThanOrEqual(550);
     expect(m.bunkerPriceUsdPerTonne).toBeLessThanOrEqual(650);
     expect(new Set(m.ships.map((s) => s.name)).size).toBe(m.ships.length);
@@ -127,9 +133,8 @@ describe('generateMarket', () => {
     for (const date of DATES) {
       const m = generateMarket(date);
       for (const cargo of m.cargoes) {
-        const winnable = m.ships.some(
-          (ship) => ship.vesselClass === cargo.vesselClass && hasDealZone(m, ship, cargo),
-        );
+        // Right size, makes the laycan, and has a positive deal zone.
+        const winnable = m.ships.some((ship) => isWorkable(m, ship, cargo));
         expect(winnable, `${date} cargo ${cargo.id}`).toBe(true);
       }
     }
@@ -170,22 +175,25 @@ describe('generateMarket', () => {
     expect(ballasts.some((nm) => nm > CLOSE_OPEN_NM && nm <= NEARBY_OPEN_NM)).toBe(true);
   });
 
-  it('makes ships compete: on most days one ship is the best fit for two cargoes', () => {
-    let contested = 0;
+  it('makes ships compete: every day one ship is a workable fit for two cargoes', () => {
     for (const date of DATES) {
       const m = generateMarket(date);
-      const bestShipFor = m.cargoes.map((c) => {
-        const ranked = m.ships
-          .filter((s) => s.vesselClass === c.vesselClass)
-          .map((s) => ({ id: s.id, tce: estimateVoyage(m, s, c, c.marketRateUsdPerTonne).tceUsdPerDay }))
-          .sort((a, b) => b.tce - a.tce);
-        return ranked[0]!.id;
-      });
-      if (new Set(bestShipFor).size < bestShipFor.length) contested++;
+      const shared = m.ships.some((ship) => m.cargoes.filter((c) => isWorkable(m, ship, c)).length >= 2);
+      expect(shared, date).toBe(true);
     }
-    // About 3 days in 4 by design, but not every day.
-    expect(contested).toBeGreaterThanOrEqual(60);
-    expect(contested).toBeLessThan(DATES.length);
+  });
+
+  it('only lets a ship fit a cargo if it is the right size and can make the laycan', () => {
+    for (const date of DATES.slice(0, 30)) {
+      const m = generateMarket(date);
+      for (const c of m.cargoes) {
+        for (const s of m.ships) {
+          const f = fitCheck(s, c);
+          expect(f.fits).toBe(s.vesselClass === c.vesselClass && f.arrivalDay <= c.laycanEndDay);
+          if (s.vesselClass !== c.vesselClass) expect(f.problem).toBe('wrongSize');
+        }
+      }
+    }
   });
 
   it('only uses trades whose ports handle the commodity', () => {

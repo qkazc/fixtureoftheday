@@ -1,10 +1,15 @@
 // Daily market: the ships and cargoes on offer for one day's challenge.
 // The same date always gives the same market.
 //
+// Days are counted from today (day 0). Each ship opens on some day; each
+// cargo has a laycan window, and a ship fits only if it can reach the load
+// port by the end of the laycan.
+//
 // SIMPLIFICATIONS (see LEARNING.md):
-// - No dates: every ship is ready now, so there are no laycans.
 // - Each trade needs exactly one ship class; no crossovers.
-// PLACEHOLDER: bunker price range, commission and rate noise are hand-picked.
+// - Arriving before the laycan is fine (the ship just waits).
+// PLACEHOLDER: bunker price range, commission, rate noise, open days and
+// laycan windows are hand-picked.
 
 import { distanceNm, type Commodity, type PortId, PORT_IDS } from './ports';
 import { createRng, hashSeed, pick, randomInt, shuffle, type Rng } from './random';
@@ -38,6 +43,9 @@ export interface CargoOrder extends Trade {
   quantityTonnes: number;
   /** Going rate in $/t: gives a ship with a typical ballast leg about the class's market TCE. */
   marketRateUsdPerTonne: number;
+  /** Laycan: the ship must arrive at the load port between these days (from today). */
+  laycanStartDay: number;
+  laycanEndDay: number;
 }
 
 export interface ShipOffer {
@@ -45,6 +53,10 @@ export interface ShipOffer {
   name: string;
   vesselClass: VesselClass;
   openPort: PortId;
+  /** Day (from today) the ship becomes free at its open port. */
+  openDay: number;
+  /** Deadweight in tonnes, as shown on a position list. */
+  dwt: number;
 }
 
 export interface DailyMarket {
@@ -54,7 +66,12 @@ export interface DailyMarket {
   ships: ShipOffer[];
 }
 
-export const CARGOES_PER_DAY = 4;
+/** Cargoes (and so enquiries) per day: 3 or 4. */
+export const CARGOES_PER_DAY_RANGE: readonly [number, number] = [3, 4];
+/** Ships open between today and this many days from now. PLACEHOLDER. */
+export const MAX_OPEN_DAY = 6;
+/** Laycan windows are this many days wide. PLACEHOLDER. */
+export const LAYCAN_DAYS = 3;
 /** Address commission + brokerage assumed when setting market rates. */
 export const MARKET_COMMISSION_PCT = 5;
 /**
@@ -71,8 +88,6 @@ export const TYPICAL_BALLAST_NM = 2_000;
 export const NEARBY_OPEN_NM = 4_000;
 /** Within this distance a matching ship counts as "close" rather than "medium". */
 export const CLOSE_OPEN_NM = 1_000;
-/** Chance of adding a contested pair on a day that lacks one (about 3 days in 4 end up contested). PLACEHOLDER: tuned for play. */
-export const CONTEST_CHANCE = 0.5;
 const RATE_NOISE = 0.1; // market rates vary up to ±10% around the target
 const SHIP_NAMES = [
   'Amber Tern', 'Blue Heron', 'Cape Lark', 'Coral Wren', 'Golden Kite', 'Iron Gull',
@@ -86,44 +101,57 @@ export function generateMarket(date: string): DailyMarket {
   const rng = createRng(hashSeed(date));
   const bunkerPriceUsdPerTonne = randomInt(rng, 110, 130) * 5; // $550–650
 
-  const cargoes = drawTrades(rng).map((trade, i) =>
+  const cargoCount = randomInt(rng, CARGOES_PER_DAY_RANGE[0], CARGOES_PER_DAY_RANGE[1]);
+  const cargoes = drawTrades(rng, cargoCount).map((trade, i) =>
     makeCargo(rng, trade, `C${i + 1}`, bunkerPriceUsdPerTonne),
   );
 
   // One ship per cargo, of the right class and open within NEARBY_OPEN_NM of
-  // its load port, so every day has a sensible match. Plus one shared ship
-  // that two cargoes compete for (see sharedShip). Shuffled so the order
-  // gives nothing away.
+  // its load port, so every day has a sensible match. Plus a shared ship that
+  // two cargoes compete for, and a decoy that opens anywhere. Shuffled so the
+  // order gives nothing away.
   const contest = pickContest(rng, cargoes);
-  const placements: { vesselClass: VesselClass; openPort: PortId; forCargo?: CargoOrder }[] = [
+  type Placement = { vesselClass: VesselClass; openPort: PortId; openDay: number; forCargoes: CargoOrder[] };
+  const placements: Placement[] = [
     ...cargoes.map((c) => ({
       vesselClass: c.vesselClass,
-      // The two contested cargoes get their own ship at medium distance, so
-      // the shared ship is the stronger candidate for both.
-      openPort: contest?.cargoes.includes(c)
-        ? fartherPort(rng, c.loadPort, contest)
-        : nearbyPort(rng, c.loadPort),
-      forCargo: c,
+      // The two contested cargoes get their own ship farther away, so the
+      // shared ship is the stronger candidate for both.
+      openPort: contest.cargoes.includes(c) ? fartherPort(rng, c.loadPort, contest) : nearbyPort(rng, c.loadPort),
+      openDay: randomInt(rng, 0, MAX_OPEN_DAY),
+      forCargoes: [c],
     })),
-    contest?.ship ?? { vesselClass: pick(rng, VESSEL_CLASS_IDS), openPort: pick(rng, PORT_IDS) },
+    { ...contest.ship, openDay: randomInt(rng, 0, MAX_OPEN_DAY), forCargoes: [...contest.cargoes] },
+    {
+      vesselClass: pick(rng, VESSEL_CLASS_IDS),
+      openPort: pick(rng, PORT_IDS),
+      openDay: randomInt(rng, 0, MAX_OPEN_DAY),
+      forCargoes: [],
+    },
   ];
   const names = shuffle(rng, SHIP_NAMES);
   const placed = shuffle(rng, placements).map((p, i) => ({
-    ship: { id: `S${i + 1}`, name: names[i]!, vesselClass: p.vesselClass, openPort: p.openPort },
-    forCargo: p.forCargo,
+    ship: {
+      id: `S${i + 1}`,
+      name: names[i]!,
+      vesselClass: p.vesselClass,
+      openPort: p.openPort,
+      openDay: p.openDay,
+      dwt: VESSEL_CLASSES[p.vesselClass].vessel.dwt,
+    },
+    forCargoes: p.forCargoes,
   }));
   const market: DailyMarket = { date, bunkerPriceUsdPerTonne, cargoes, ships: placed.map((p) => p.ship) };
 
   // Clients' hidden limits can leave a cargo with no ship it could be fixed
-  // with. If so, move its guaranteed ship to the load port, and recheck until
-  // every cargo is winnable (each move only ever fixes things for its cargo).
+  // with. If so, move its own ship to the load port (which only makes it
+  // arrive earlier), and recheck until every cargo is winnable.
   for (let changed = true; changed; ) {
     changed = false;
     for (const cargo of cargoes) {
-      const winnable = market.ships.some(
-        (ship) => ship.vesselClass === cargo.vesselClass && hasDealZone(market, ship, cargo),
-      );
-      const own = placed.find((p) => p.forCargo === cargo)!.ship;
+      setLaycan(rng, cargo, placed.filter((p) => p.forCargoes.includes(cargo)).map((p) => p.ship));
+      const winnable = market.ships.some((ship) => isWorkable(market, ship, cargo));
+      const own = placed.find((p) => p.forCargoes.length === 1 && p.forCargoes[0] === cargo)!.ship;
       if (!winnable && own.openPort !== cargo.loadPort) {
         own.openPort = cargo.loadPort;
         changed = true;
@@ -131,6 +159,39 @@ export function generateMarket(date: string): DailyMarket {
     }
   }
   return market;
+}
+
+/**
+ * Sets a cargo's laycan so every ship placed for it can arrive in time:
+ * it ends 1-4 days after the latest of their arrivals. Only set once per
+ * cargo, so later moves (which only make ships arrive earlier) keep it valid.
+ */
+function setLaycan(rng: Rng, cargo: CargoOrder, shipsFor: readonly ShipOffer[]): void {
+  if (cargo.laycanEndDay >= 0) return;
+  const latest = Math.max(...shipsFor.map((s) => arrivalDay(s, cargo)));
+  cargo.laycanEndDay = Math.ceil(latest) + randomInt(rng, 1, 4);
+  cargo.laycanStartDay = Math.max(1, cargo.laycanEndDay - LAYCAN_DAYS);
+}
+
+/** Day the ship would reach the cargo's load port, sailing straight there once open. */
+export function arrivalDay(ship: ShipOffer, cargo: CargoOrder): number {
+  const knots = VESSEL_CLASSES[ship.vesselClass].vessel.speedKnots;
+  return ship.openDay + distanceNm(ship.openPort, cargo.loadPort) / (knots * 24);
+}
+
+export type FitProblem = 'wrongSize' | 'missesLaycan';
+
+/** Can this ship carry this cargo at all? Right size, and at the load port by the end of the laycan. */
+export function fitCheck(ship: ShipOffer, cargo: CargoOrder): { fits: boolean; problem: FitProblem | null; arrivalDay: number } {
+  const arrival = arrivalDay(ship, cargo);
+  const problem: FitProblem | null =
+    ship.vesselClass !== cargo.vesselClass ? 'wrongSize' : arrival > cargo.laycanEndDay ? 'missesLaycan' : null;
+  return { fits: problem === null, problem, arrivalDay: arrival };
+}
+
+/** The ship fits the cargo and some rate would satisfy both owner and charterer. */
+export function isWorkable(market: DailyMarket, ship: ShipOffer, cargo: CargoOrder): boolean {
+  return fitCheck(ship, cargo).fits && hasDealZone(market, ship, cargo);
 }
 
 /** Owner floor: lowest acceptable TCE, as a share of the class market TCE. */
@@ -189,15 +250,15 @@ const CLOSE_PAIRS = TRADES.flatMap((a, i) =>
 );
 
 /**
- * The day's trades. Most days (CONTEST_CHANCE) include a close pair, so
- * that two cargoes compete for one well-placed ship.
+ * The day's trades. Every day includes a close pair, so that two cargoes
+ * compete for one well-placed ship.
  */
-function drawTrades(rng: Rng): Trade[] {
-  let trades = shuffle(rng, TRADES).slice(0, CARGOES_PER_DAY);
+function drawTrades(rng: Rng, count: number): Trade[] {
+  let trades = shuffle(rng, TRADES).slice(0, count);
   const hasPair = trades.some((a, i) => trades.slice(i + 1).some((b) => isClosePair(a, b)));
-  if (!hasPair && rng() < CONTEST_CHANCE) {
+  if (!hasPair) {
     const [a, b] = pick(rng, CLOSE_PAIRS);
-    const rest = shuffle(rng, TRADES.filter((t) => t !== a && t !== b)).slice(0, CARGOES_PER_DAY - 2);
+    const rest = shuffle(rng, TRADES.filter((t) => t !== a && t !== b)).slice(0, count - 2);
     trades = shuffle(rng, [a, b, ...rest]);
   }
   return trades;
@@ -207,16 +268,15 @@ function drawTrades(rng: Rng): Trade[] {
  * The day's contest: two cargoes of the same class loading within
  * NEARBY_OPEN_NM of each other, and one extra ship of that class open at the
  * port closest to both load ports, so the player must decide which cargo
- * gets it. Null if no such pair exists that day.
+ * gets it. drawTrades guarantees such a pair exists.
  */
 function pickContest(
   rng: Rng,
   cargoes: readonly CargoOrder[],
-): { cargoes: readonly CargoOrder[]; ship: { vesselClass: VesselClass; openPort: PortId } } | null {
+): { cargoes: readonly CargoOrder[]; ship: { vesselClass: VesselClass; openPort: PortId } } {
   const pairs = cargoes.flatMap((a, i) =>
     cargoes.slice(i + 1).filter((b) => isClosePair(a, b)).map((b) => [a, b] as const),
   );
-  if (pairs.length === 0) return null;
   const [a, b] = pick(rng, pairs);
   const reach = (p: PortId) => Math.max(distanceNm(p, a.loadPort), distanceNm(p, b.loadPort));
   const openPort = PORT_IDS.reduce((best, p) => (reach(p) < reach(best) ? p : best));
@@ -262,7 +322,8 @@ function makeCargo(rng: Rng, trade: Trade, id: string, bunkerPriceUsdPerTonne: n
   const targetTce = spec.marketTceUsdPerDay * (1 + (rng() * 2 - 1) * RATE_NOISE);
   const rate = rateForTce(trade, quantityTonnes, bunkerPriceUsdPerTonne, targetTce);
   const marketRateUsdPerTonne = Math.round(rate * 20) / 20; // quoted to the nearest $0.05
-  return { ...trade, id, quantityTonnes, marketRateUsdPerTonne };
+  // The laycan is set once the ships are placed (see setLaycan).
+  return { ...trade, id, quantityTonnes, marketRateUsdPerTonne, laycanStartDay: -1, laycanEndDay: -1 };
 }
 
 /**

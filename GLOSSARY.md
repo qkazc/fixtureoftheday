@@ -61,6 +61,10 @@ deeper, so a shallow port or channel can stop a ship from loading fully.
 **Dry bulk**: Unpackaged cargo loaded loose into a ship's holds, such as iron
 ore, coal, grain, bauxite or fertiliser.
 
+**Enquiry**: A charterer's request to brokers to find a ship for a cargo:
+what, how much, from where to where, and when (the laycan). Brokers get many a
+day and must choose which to work on.
+
 **Firm offer**: An offer the other side can accept straight away to close the
 deal, usually with a short deadline. If it's declined, talks often end. Unlike
 a counter, it says "this is my number".
@@ -90,6 +94,9 @@ after the last day the charterer can cancel.
 **Offer**: The rate an owner asks for their ship. It usually starts above
 where the owner expects to settle.
 
+**Open date**: The day a ship becomes free for its next job. Together with the
+open port it makes up the ship's open position.
+
 **Open position**: Where and when a ship becomes free for its next job,
 usually the port where it finishes discharging its current cargo. Brokers
 circulate lists of open ships to charterers.
@@ -108,6 +115,10 @@ usually pays these.
 **Position list**: A broker's list of ships with where and when each becomes
 free (its open position). Brokers read it against their cargoes to spot which
 ships fit which jobs.
+
+**Rate idea**: The rate a charterer says it expects to pay. A guide for the
+broker, not a hard ceiling: most charterers will go a little higher for the
+right ship.
 
 **Sea margin**: An allowance (often around 5%) added to calculated sea time to
 cover bad weather and currents.
