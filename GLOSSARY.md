@@ -12,9 +12,9 @@ and is often around 2.5–3.75%.
 where it finished its last job to the port where it will load the next cargo.
 The owner pays for this leg but earns nothing on it.
 
-**Brokerage**: The commission a shipbroker earns for arranging a deal,
-usually paid by the shipowner as a percentage of the freight (often around
-1.25% per broker). In this game, this is your income.
+**Brokerage**: The commission a shipbroker earns for arranging a deal, usually
+paid by the shipowner as a percentage of the freight (often around 1.25% per
+broker). In this game, this is your income.
 
 **Bunkers**: Ship's fuel. The name dates from the coal bunkers that steamships
 stored their fuel in. Bunker costs are usually the biggest single voyage
@@ -27,11 +27,18 @@ cargo owner, or a trader shipping cargo on someone else's behalf.
 fuel, fresh water, stores and crew. Because fuel and stores take up some of
 it, the cargo a ship can actually lift is always a bit less than its DWT.
 
+**Demurrage**: Money the charterer pays the owner when loading or discharging
+takes longer than the time allowed in the contract. It compensates the owner
+for the ship being stuck in port.
+
+**Draft (draught)**: How deep a ship sits in the water. A loaded ship sits
+deeper, so a shallow port or channel can stop a ship from loading fully.
+
 **Dry bulk**: Unpackaged cargo loaded loose into a ship's holds, such as iron
 ore, coal, grain, bauxite or fertiliser.
 
-**Freight**: The money a charterer pays the shipowner for carrying a cargo.
-In dry bulk it is usually quoted in US dollars per tonne of cargo.
+**Freight**: The money a charterer pays the shipowner for carrying a cargo. In
+dry bulk it is usually quoted in US dollars per tonne of cargo.
 
 **Knot**: A speed of one nautical mile per hour. A ship doing 13 knots covers
 13 × 24 = 312 nautical miles a day.
@@ -50,22 +57,30 @@ spares, stores. Opex is not a voyage cost.
 dues, pilots, tugs, berth fees, agency fees. On a voyage charter the shipowner
 usually pays these.
 
+**Sea margin**: An allowance (often around 5%) added to calculated sea time to
+cover bad weather and currents.
+
 **Shipbroker**: An intermediary who matches ships with cargoes and negotiates
 the deal between owner and charterer, earning a commission on the freight.
 
 **Shipowner**: The company that owns (or controls) a ship and offers it for
 hire.
 
+**Supramax**: A mid-sized dry bulk carrier of roughly 50,000–60,000 DWT,
+usually with its own cranes, so it can load and discharge at ports without
+shore cranes. A workhorse for grain, coal, fertiliser and minerals.
+
 **TCE (Time Charter Equivalent)**: A voyage's earnings converted into dollars
 per day: (freight − voyage costs) ÷ voyage days. It lets an owner compare a
 voyage-charter offer with a time-charter offer that pays a daily rate.
 
 **Time charter**: A contract where the charterer hires the ship for a period
-of time and pays a daily rate (called "hire"). The charterer pays for fuel
-and port costs; the owner still pays opex.
+of time and pays a daily rate (called "hire"). The charterer pays for fuel and
+port costs; the owner still pays opex.
 
 **Voyage charter**: A contract to carry one specific cargo from A to B for a
-freight rate per tonne. The owner pays fuel and port costs out of that freight.
+freight rate per tonne. The owner pays fuel and port costs out of that
+freight.
 
 **Voyage costs**: Costs that exist only because of a particular voyage: mainly
 bunkers, port costs and commissions. Different from opex, which the owner pays
