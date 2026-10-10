@@ -148,3 +148,19 @@ td.num { text-align: right; }
 .key.ballast { color: var(--ballast); }
 .key.late { color: var(--muted); }
 
+/* Day board */
+.tabs { display: flex; gap: 6px; margin: 0 0 8px; }
+button.tab.active { border-color: var(--accent); color: var(--accent); }
+table.board th, table.board td { vertical-align: top; }
+table.board th.col { color: var(--muted); text-transform: none; letter-spacing: 0; font-size: 11px; }
+table.board th.col.focus { color: var(--accent); }
+table.board th[scope='row'] { color: var(--fg); text-transform: none; letter-spacing: 0; font-size: 12px; }
+button.cell { display: block; width: 100%; min-width: 9em; text-align: left; padding: 4px 6px; font-variant-numeric: tabular-nums; }
+button.cell:disabled { cursor: default; opacity: 0.45; }
+button.cell.fixedHere { opacity: 1; border-color: var(--good); }
+button.cell.chosen { border-color: var(--accent); }
+.cell.none { color: var(--muted); opacity: 0.6; }
+.tce.good, .fixed { color: var(--good); }
+.tce.ok { color: var(--ok); }
+.tce.bad, .late { color: var(--bad); }
+

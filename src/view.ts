@@ -12,7 +12,6 @@ import {
   handleDistraction,
   hoursLeft,
   research,
-  researchRows,
   startDay,
   summarizeDay,
   PORTS,
@@ -23,6 +22,7 @@ import {
   type Inbox,
 } from '../engine';
 import { formatClass, formatCommodity, formatNm, formatUsd, formatUsdPerDay } from './format';
+import { boardCell } from './board';
 import { drawMap } from './mapView';
 import {
   blockMessage,
@@ -75,6 +75,8 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
   /** Last message shown under each email (the result of its last action). */
   const messages = new Map<string, string>();
   const shipChoice = new Map<string, string>();
+  /** Which view the day's market board shows. */
+  let boardTab: 'positions' | 'index' = 'positions';
   const rateChoice = new Map<string, string>();
 
   function apply(emailId: string, result: { ok: true; state: DayState } | { ok: false; reason: BlockReason }, okText: string): void {
@@ -101,7 +103,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
           : [
               pane('Map', 'map', mapView()),
               pane('Inbox', 'inbox', inboxList()),
-              pane('Market board', 'board', rateIndex()),
+              pane('Market board', 'board', dayBoard()),
               pane('Email', 'email', openId ? emailView(openId) : el('p', { class: 'muted' }, 'Open an email to read it.')),
             ];
     root.replaceChildren(topBar(screen), el('main', { class: `desk desk-${screen}` }, ...panes));
@@ -145,6 +147,75 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
         )
       : el('p', { class: 'legend muted' }, started ? 'Open an enquiry to see its voyage and the ships that could take it.' : '▲ ship · open date');
     return el('div', {}, drawMap(inbox, { cargo, fixedShipIds: new Set(day.fixtures.map((f) => f.shipId)) }), legend);
+  }
+
+  function dayBoard(): HTMLElement {
+    const tab = (id: typeof boardTab, label: string) =>
+      button(label, () => ((boardTab = id), render()), { class: boardTab === id ? 'tab active' : 'tab', 'aria-pressed': String(boardTab === id) });
+    return el(
+      'div',
+      {},
+      el('p', { class: 'tabs' }, tab('positions', 'Positions × enquiries'), tab('index', 'Freight index')),
+      boardTab === 'index' ? rateIndex() : positionsBoard(),
+    );
+  }
+
+  function positionsBoard(): HTMLElement {
+    const enquiries = inbox.emails.filter((e): e is EnquiryEmail => e.kind === 'enquiry');
+    const head = el(
+      'tr',
+      {},
+      el('th', {}, 'Ship · open'),
+      ...enquiries.map((e) => {
+        const cargo = inbox.market.cargoes.find((c) => c.id === e.cargoId)!;
+        const status = enquiryStatus(day, e);
+        return el(
+          'th',
+          { class: openId === e.id ? 'col focus' : 'col' },
+          `${formatClass(cargo.vesselClass)} ${formatCommodity(cargo.commodity).toLowerCase()}`,
+          el('br'),
+          `${PORTS[cargo.loadPort].name} → ${PORTS[cargo.dischargePort].name}`,
+          el('br'),
+          status === 'open' ? (day.researched.includes(e.id) ? 'researched' : 'not researched') : status.toUpperCase(),
+        );
+      }),
+    );
+    const rows = inbox.market.ships.map((ship) =>
+      el(
+        'tr',
+        {},
+        el('th', { scope: 'row' }, ship.name, el('br'), el('span', { class: 'muted' }, `${formatClass(ship.vesselClass)} · ${PORTS[ship.openPort].name} ${calendarDay(inbox.date, ship.openDay)}`)),
+        ...enquiries.map((e) => el('td', {}, boardButton(ship.id, e))),
+      ),
+    );
+    return el(
+      'div',
+      {},
+      el('table', { class: 'board' }, el('thead', {}, head), el('tbody', {}, ...rows)),
+      el('p', { class: 'legend muted' }, 'Ballast always shown. Owner TCE at the rate idea appears once you research an enquiry: green beats the market, amber is within 20%, red is worse. Pick a cell to work that pair.'),
+    );
+  }
+
+  function boardButton(shipId: string, e: EnquiryEmail): HTMLElement {
+    const cell = boardCell(inbox, day, shipId, e);
+    if (cell.fit === 'wrongSize') return el('span', { class: 'cell none', title: 'Wrong size for this cargo' }, '—');
+    const level = cell.estTceRatio === null ? '' : cell.estTceRatio >= 1 ? 'good' : cell.estTceRatio >= 0.8 ? 'ok' : 'bad';
+    const lines: (Node | string)[] = [formatNm(cell.ballastNm)];
+    if (cell.estTceUsdPerDay !== null) lines.push(el('br'), el('span', { class: `tce ${level}` }, formatUsdPerDay(cell.estTceUsdPerDay)));
+    if (cell.fit === 'missesLaycan') lines.push(el('br'), el('span', { class: 'late' }, 'too late'));
+    if (cell.state === 'fixedHere') lines.push(el('br'), el('span', { class: 'fixed' }, 'FIXED'));
+    const b = button('', () => {
+      openId = e.id;
+      read.add(e.id);
+      shipChoice.set(e.id, shipId);
+      render();
+    }, {
+      class: `cell ${cell.state}${openId === e.id && shipChoice.get(e.id) === shipId ? ' chosen' : ''}`,
+      'aria-label': `${inbox.market.ships.find((s) => s.id === shipId)!.name} for ${e.subject}`,
+    });
+    b.replaceChildren(...lines);
+    b.disabled = cell.state !== 'open';
+    return b;
   }
 
   function newsList(): HTMLElement {
@@ -262,7 +333,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
 
     const out: HTMLElement[] = [];
     if (day.researched.includes(e.id)) {
-      out.push(researchTable(e));
+      out.push(el('p', { class: 'muted' }, 'Researched: voyage estimates are on the market board.'));
     } else {
       out.push(
         el(
@@ -320,38 +391,6 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
       el('p', {}, fix),
     );
     return out;
-  }
-
-  function researchTable(e: EnquiryEmail): HTMLElement {
-    const cargo = inbox.market.cargoes.find((c) => c.id === e.cargoId)!;
-    const rows = researchRows(inbox, day, e.id);
-    const laycan = `${calendarDay(inbox.date, cargo.laycanStartDay)} to ${calendarDay(inbox.date, cargo.laycanEndDay)}`;
-    return el(
-      'div',
-      {},
-      el('p', {}, `Voyage estimates at the rate idea (laycan ${laycan}):`),
-      el(
-        'table',
-        {},
-        el('thead', {}, el('tr', {}, ...['Ship', 'Size', 'Ballast', 'Arrives', 'Owner TCE', 'Fits?'].map((h) => el('th', {}, h)))),
-        el(
-          'tbody',
-          {},
-          ...rows.map((r) =>
-            el(
-              'tr',
-              {},
-              el('td', {}, r.ship.name),
-              el('td', {}, `${formatClass(r.ship.vesselClass)}`),
-              el('td', {}, formatNm(r.ballastNm)),
-              el('td', {}, calendarDay(inbox.date, Math.ceil(r.arrivalDay))),
-              el('td', {}, r.estTceUsdPerDay === null ? '–' : formatUsdPerDay(r.estTceUsdPerDay)),
-              el('td', {}, r.fits ? 'yes' : r.problem === 'wrongSize' ? 'wrong size' : 'misses laycan'),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   function summaryView(): HTMLElement {
