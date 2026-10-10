@@ -46,9 +46,10 @@ Places where the game deliberately differs from reality, and why.
   ship needs, which is why a well-placed ship can beat the market.
 
 ### Scoring (`engine/scoring.ts`)
-- **Nobody refuses a deal.** In reality an owner would turn down a rate
-  that loses money, and a charterer wouldn't pay far above market.
-  Refusals belong in a future negotiation step.
+- **Fixed, hidden walk-away points.** The owner refuses below 80% of the
+  market TCE and the charterer above 120% of the market rate, every time.
+  Real walk-away points vary by client and by how badly each side needs the
+  deal, and there is no counter-offer yet (negotiation comes next).
 - **Satisfaction is only about money.** Real relationships also depend on
   reliability, timing and how disputes were handled.
 - **One broker, fixed 1.25%.** Deals often go through two or more brokers

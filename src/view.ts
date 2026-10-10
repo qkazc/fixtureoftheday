@@ -25,7 +25,7 @@ const HINTS = {
   bunkers: 'Bunkers: ship fuel. Usually the biggest voyage cost.',
   owner: 'Shipowner satisfaction: 50 means they earn the market TCE for their class; ±20% takes it to 100 or 0.',
   charterer: 'Charterer satisfaction: 50 means they pay the market rate; 20% cheaper is 100, 20% dearer is 0.',
-  score: 'Score: brokerage × (owner + charterer satisfaction) ÷ 100.',
+  score: 'Score: brokerage × (owner + charterer satisfaction) ÷ 100. A refused fixture scores nothing.',
 } as const;
 
 type Attrs = Record<string, string>;
@@ -190,6 +190,12 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
 
 const whole = (n: number) => Math.round(n).toLocaleString('en-US');
 
+function refusal(status: 'refusedByOwner' | 'refusedByCharterer'): HTMLElement {
+  return status === 'refusedByOwner'
+    ? el('span', { class: 'refused', title: 'The owner would earn too little on this voyage.' }, 'Owner refuses')
+    : el('span', { class: 'refused', title: 'The charterer won’t pay this much.' }, 'Charterer refuses');
+}
+
 function fillResult(market: DailyMarket, cells: HTMLTableCellElement[], r: FixtureResult | null): void {
   if (!r) {
     for (const cell of cells) cell.replaceChildren('–');
@@ -205,7 +211,7 @@ function fillResult(market: DailyMarket, cells: HTMLTableCellElement[], r: Fixtu
     satisfactionBadge(r.ownerSatisfaction),
     satisfactionBadge(r.chartererSatisfaction),
     formatUsd(r.brokerageUsd),
-    whole(r.score),
+    r.status === 'fixed' ? whole(r.score) : refusal(r.status),
   ];
   cells.forEach((cell, i) => cell.replaceChildren(values[i]!));
 }

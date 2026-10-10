@@ -93,6 +93,40 @@ describe('scoreDay', () => {
     expect(day.totalScore).toBeCloseTo(a!.score + b!.score, 6);
   });
 
+  describe('refusals', () => {
+    it('agrees a fixture inside both limits', () => {
+      expect(scoreOne(fix('atLoadPort', marketRate)).status).toBe('fixed');
+    });
+
+    it('has the charterer refuse more than 20% above the market rate', () => {
+      expect(scoreOne(fix('atLoadPort', marketRate * 1.19)).status).toBe('fixed');
+      const r = scoreOne(fix('atLoadPort', marketRate * 1.21));
+      expect(r.status).toBe('refusedByCharterer');
+      expect(r.brokerageUsd).toBe(0);
+      expect(r.score).toBe(0);
+    });
+
+    it('stops an absurd rate from farming brokerage', () => {
+      const day = scoreDay(market, [fix('atLoadPort', 3000)]);
+      expect(day.fixtures[0]!.status).toBe('refusedByCharterer');
+      expect(day.totalBrokerageUsd).toBe(0);
+      expect(day.totalScore).toBe(0);
+    });
+
+    it('has the owner refuse a voyage earning under 80% of market TCE', () => {
+      // 7,250 nm empty from Qingdao: far too little at the market rate.
+      const r = scoreOne(fix('farAway', marketRate));
+      expect(r.voyage.tceUsdPerDay).toBeLessThan(VESSEL_CLASSES.supramax.marketTceUsdPerDay * 0.8);
+      expect(r.status).toBe('refusedByOwner');
+      expect(r.score).toBe(0);
+    });
+
+    it('says which side refused', () => {
+      expect(scoreOne(fix('farAway', marketRate * 0.5)).status).toBe('refusedByOwner');
+      expect(scoreOne(fix('farAway', marketRate * 1.25)).status).toBe('refusedByCharterer');
+    });
+  });
+
   describe('rejects invalid fixtures', () => {
     it('ship class that does not match the cargo', () => {
       expect(() => scoreDay(market, [fix('cape', 20)])).toThrow(/needs a supramax/);

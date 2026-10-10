@@ -2,7 +2,8 @@
 // shipowner and the charterer are with each fixture.
 //
 // SIMPLIFICATIONS (see LEARNING.md):
-// - Neither side can refuse a deal, however bad (negotiation comes later).
+// - Each side refuses only at the edge of its satisfaction band, and there
+//   is no back-and-forth yet (negotiation comes later).
 // - Satisfaction depends only on money, not timing or reputation.
 // - One broker per fixture, always earning the same brokerage percentage.
 // PLACEHOLDER: the ±20% satisfaction bands are tuned for gameplay.
@@ -17,15 +18,24 @@ export interface Fixture {
   rateUsdPerTonne: number;
 }
 
+/**
+ * A fixture only happens if both sides accept the rate. The owner refuses if
+ * the voyage earns less than (1 − band) × the class market TCE; the charterer
+ * refuses to pay more than (1 + band) × the cargo's market rate.
+ */
+export type FixtureStatus = 'fixed' | 'refusedByOwner' | 'refusedByCharterer';
+
 export interface FixtureResult {
   fixture: Fixture;
+  status: FixtureStatus;
   voyage: VoyageResult;
+  /** Zero unless the fixture was agreed. */
   brokerageUsd: number;
   /** 0–100; 50 means the owner earns exactly the class market TCE. */
   ownerSatisfaction: number;
   /** 0–100; 50 means the charterer pays exactly the market rate. */
   chartererSatisfaction: number;
-  /** brokerage × (owner + charterer satisfaction) / 100. */
+  /** brokerage × (owner + charterer satisfaction) / 100; zero if refused. */
   score: number;
 }
 
@@ -98,13 +108,23 @@ function scoreFixture(
     { bunkerPriceUsdPerTonne: market.bunkerPriceUsdPerTonne },
   );
 
-  const brokerageUsd = voyage.grossFreightUsd * (BROKERAGE_PCT / 100);
-  const ownerSatisfaction = satisfaction(voyage.tceUsdPerDay / spec.marketTceUsdPerDay);
+  const ownerRatio = voyage.tceUsdPerDay / spec.marketTceUsdPerDay;
+  const rateRatio = fixture.rateUsdPerTonne / cargo.marketRateUsdPerTonne;
+  const ownerSatisfaction = satisfaction(ownerRatio);
   // The charterer is happier the *less* they pay, so flip the ratio around 1.
-  const chartererSatisfaction = satisfaction(2 - fixture.rateUsdPerTonne / cargo.marketRateUsdPerTonne);
+  const chartererSatisfaction = satisfaction(2 - rateRatio);
+
+  const status: FixtureStatus =
+    rateRatio > 1 + SATISFACTION_BAND
+      ? 'refusedByCharterer'
+      : ownerRatio < 1 - SATISFACTION_BAND
+        ? 'refusedByOwner'
+        : 'fixed';
+  const brokerageUsd =
+    status === 'fixed' ? voyage.grossFreightUsd * (BROKERAGE_PCT / 100) : 0;
   const score = brokerageUsd * ((ownerSatisfaction + chartererSatisfaction) / 100);
 
-  return { fixture, voyage, brokerageUsd, ownerSatisfaction, chartererSatisfaction, score };
+  return { fixture, status, voyage, brokerageUsd, ownerSatisfaction, chartererSatisfaction, score };
 }
 
 function findById<T extends { id: string }>(items: readonly T[], id: string, kind: string): T {

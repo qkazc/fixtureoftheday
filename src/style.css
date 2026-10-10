@@ -58,4 +58,5 @@ input[type='number'] { width: 6.5em; }
 .badge.good { color: var(--good); }
 .badge.ok { color: var(--ok); }
 .badge.bad { color: var(--bad); }
+.refused { color: var(--bad); font-weight: 600; }
 .totals { margin-top: 1rem; font-size: 1.1rem; }

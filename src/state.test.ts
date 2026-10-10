@@ -50,6 +50,15 @@ describe('toFixtures and evaluate', () => {
     expect(e.totalBrokerageUsd).toBeCloseTo(e.byCargo['C4']!.brokerageUsd, 6);
   });
 
+  it('gives no brokerage or score for a refused fixture', () => {
+    const s = initialSelections(market);
+    s['C4'] = { shipId: 'S3', rateUsdPerTonne: 3000 };
+    const e = evaluate(market, s);
+    expect(e.byCargo['C4']?.status).toBe('refusedByCharterer');
+    expect(e.totalBrokerageUsd).toBe(0);
+    expect(e.totalScore).toBe(0);
+  });
+
   it('skips rows whose rate is blank, zero or negative', () => {
     const s = initialSelections(market);
     s['C4'] = { shipId: 'S3', rateUsdPerTonne: Number.NaN };
