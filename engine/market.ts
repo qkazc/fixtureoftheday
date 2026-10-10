@@ -268,10 +268,43 @@ export function negotiationLimits(
   };
 }
 
-/** True if some rate would satisfy both the owner's floor and the charterer's ceiling. */
+/** Rates the player can quote, as shares of the rate idea (the rate slider's ends). */
+export const QUOTE_RANGE: readonly [number, number] = [0.7, 1.3];
+/** Rates are quoted to the nearest 5 cents a tonne. */
+export const QUOTE_STEPS_PER_USD = 20;
+
+const toQuoteGrid = (usd: number) => Math.round(usd * QUOTE_STEPS_PER_USD) / QUOTE_STEPS_PER_USD;
+
+/** The lowest and highest rate the player can quote for a cargo, on the $0.05 grid. */
+export function quoteRange(rateIdeaUsdPerTonne: number): { min: number; max: number } {
+  return {
+    min: toQuoteGrid(rateIdeaUsdPerTonne * QUOTE_RANGE[0]),
+    max: toQuoteGrid(rateIdeaUsdPerTonne * QUOTE_RANGE[1]),
+  };
+}
+
+/** Every rate the player could quote for this pair that both sides would accept, lowest first. */
+export function acceptableQuotes(market: DailyMarket, ship: ShipOffer, cargo: CargoOrder): number[] {
+  const { ownerFloorRate, chartererCeilingRate } = negotiationLimits(market, ship, cargo);
+  const { min, max } = quoteRange(cargo.marketRateUsdPerTonne);
+  const lo = Math.ceil(Math.max(ownerFloorRate, min) * QUOTE_STEPS_PER_USD - 1e-9);
+  const hi = Math.floor(Math.min(chartererCeilingRate, max) * QUOTE_STEPS_PER_USD + 1e-9);
+  const rates: number[] = [];
+  for (let step = lo; step <= hi; step++) {
+    const rate = step / QUOTE_STEPS_PER_USD;
+    // The same test a fix attempt applies, guarding against rounding at the edges.
+    if (rate >= ownerFloorRate && rate <= chartererCeilingRate) rates.push(rate);
+  }
+  return rates;
+}
+
+/**
+ * True if there is a deal zone: a rate the player can quote that satisfies
+ * both the owner's floor and the charterer's ceiling. (A zone thinner than
+ * the $0.05 quoting step doesn't count, since no quote could land in it.)
+ */
 export function hasDealZone(market: DailyMarket, ship: ShipOffer, cargo: CargoOrder): boolean {
-  const l = negotiationLimits(market, ship, cargo);
-  return l.ownerFloorRate <= l.chartererCeilingRate;
+  return acceptableQuotes(market, ship, cargo).length > 0;
 }
 
 /** Two trades a single ship could reasonably serve: same class, load ports close together. */

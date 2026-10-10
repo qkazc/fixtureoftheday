@@ -6,5 +6,6 @@ export * from './market';
 export * from './ports';
 export * from './random';
 export * from './scoring';
+export * from './solver';
 export * from './vessels';
 export * from './voyage';

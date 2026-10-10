@@ -7,6 +7,7 @@ import {
   DISTRACTION_PAYOUT_USD,
   enquiryStatus,
   generateBriefing,
+  quoteRange,
   hoursLeft,
   startDay,
   summarizeDay,
@@ -374,8 +375,8 @@ export function renderGame(root: HTMLElement, inbox: Inbox, store: StorageLike |
       id: `rate-${e.id}`,
       'aria-label': 'Freight rate in dollars per tonne',
       // Ends on the $0.05 grid so every slider position is a quotable rate.
-      min: (Math.round(idea * 0.7 * 20) / 20).toFixed(2),
-      max: (Math.round(idea * 1.3 * 20) / 20).toFixed(2),
+      min: quoteRange(idea).min.toFixed(2),
+      max: quoteRange(idea).max.toFixed(2),
       step: '0.05',
       value: startRate,
     });
