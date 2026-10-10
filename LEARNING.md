@@ -61,21 +61,12 @@ Places where the game deliberately differs from reality, and why.
 - **One broker, fixed 1.25%.** Deals often go through two or more brokers
   who split the commission.
 
-### Negotiation (`engine/negotiation.ts`)
-- **One message to both sides.** The broker sends the same proposed rate to
-  the owner and the charterer each round. Real brokers relay separate
-  messages, and tune what they tell each side.
-- **Steady concessions.** Each client concedes the same share of the gap
-  every round (35–65%, varying by client). Real clients concede unevenly,
-  bluff, and react to how a proposal is pitched.
-- **Firm offers and a last call.** A firm offer closes if it's inside both
-  hidden limits and kills the deal otherwise; round 3 is always firm. Real
-  firm offers have time limits and can be countered rather than just declined.
-- **A budget of 8 messages a day.** Stands in for a broker's limited time.
-  Real limits are time zones, deadlines, and competing brokers fixing the
-  cargo first.
+### Hidden limits (`engine/market.ts`)
 - **Moods last a day.** Each owner's floor and charterer's ceiling come from
   the day's seed. Real clients remember how you treated them.
+- **No haggling.** An earlier version had rounds of counter-offers; the
+  inbox replaced them with one firm rate per fix attempt, with time as the
+  budget.
 
 ### The broker's day (`engine/inbox.ts`, `engine/day.ts`)
 - **Only you move the clock.** Time passes only when you research, fix or
@@ -112,11 +103,8 @@ figures later.
 - **Scoring** (`engine/scoring.ts`): ±20% satisfaction bands, tuned for
   gameplay. Brokerage of 1.25% is a common real-world figure, not sourced
   for this project.
-- **Negotiation** (`engine/market.ts`, `engine/negotiation.ts`): owner
-  floors 80–95% of market TCE, charterer ceilings 105–120% of market rate,
-  openings 10–35% away from each side's limit, concessions 35–65% of the gap
-  per counter, 3 rounds, 8 proposals per day. `engine/balance.test.ts`
-  checks that reading counters beats meeting in the middle.
+- **Hidden limits** (`engine/market.ts`): owner floors 80–95% of market
+  TCE, charterer ceilings 105–120% of market rate.
 - **Inbox and day** (`engine/inbox.ts`, `engine/market.ts`): 8 working
   hours (09:00-17:00); research 0.5 h; fixing takes 1 h (Supramax), 2 h
   (Panamax) or 3 h (Capesize); deadlines 11:00, 13:00, 15:00 or 17:00; the

@@ -153,7 +153,7 @@ export function generateInbox(date: string): Inbox {
     kind: 'positionList',
     shipIds: (list as ShipOffer[]).map((s) => s.id),
     from: owner as string,
-    subject: `${owner as string}: open tonnage`,
+    subject: 'Open tonnage',
     body: (list as ShipOffer[]).map(
       (s) =>
         `${s.name}, ${CLASS_NAMES[s.vesselClass]} ${thousands.format(s.dwt)} dwt, open ${port(s.openPort)} ${calendarDay(date, s.openDay)}`,

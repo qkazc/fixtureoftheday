@@ -41,8 +41,11 @@ owner is a beginner in shipping, so teaching is part of every change.
     `document`, etc. in the engine fails typechecking.
 - `src/`: UI only (Vite app, plain TypeScript + DOM, no framework). It
   imports from `engine/`; the engine never imports from `src/`. Pure UI
-  logic (`state.ts`, `format.ts`) is unit-tested; DOM code (`view.ts`) stays
-  thin. The UI picks the day: today's date, or `?date=YYYY-MM-DD`.
+  logic (`text.ts`, `format.ts`) is unit-tested; DOM code (`view.ts`) stays
+  thin. The UI picks the day: today's date, `?date=YYYY-MM-DD`, or
+  `#YYYY-MM-DD` (the form the published page can read).
+- The daily loop: `engine/inbox.ts` turns a day's market into emails;
+  `engine/day.ts` is the pure state machine for the 09:00-17:00 day.
 
 ## Conventions
 

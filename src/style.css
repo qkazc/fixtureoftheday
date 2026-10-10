@@ -43,53 +43,13 @@ body {
   font: 15px/1.45 system-ui, sans-serif;
 }
 h1 { margin: 0; font-size: 1.6rem; }
-h2 { margin: 1.6rem 0 0.5rem; font-size: 1.1rem; }
-.meta { margin: 0.2rem 0 0; color: var(--muted); }
-table { border-collapse: collapse; width: 100%; }
-th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
-th { background: var(--head); font-weight: 600; font-size: 0.9rem; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.scroll { overflow-x: auto; }
-abbr[title] { text-decoration: underline dotted; cursor: help; }
-select, input { font: inherit; padding: 2px 4px; }
-select { width: 100%; }
-input[type='number'] { width: 6.5em; }
-.badge { display: inline-block; min-width: 2.2em; text-align: center; border-radius: 4px; font-weight: 600; }
-.badge.good { color: var(--good); }
-.badge.ok { color: var(--ok); }
-.badge.bad { color: var(--bad); }
-h3 { margin: 0; font-size: 1rem; }
-.desk { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); }
-.card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
-.card p { margin: 0; }
-.hint { color: var(--muted); }
-.positions { font-variant-numeric: tabular-nums; }
-.round { color: var(--muted); font-size: 0.9rem; }
-.round.last { color: var(--ok); font-weight: 600; }
-.propose { display: flex; gap: 8px; flex-wrap: wrap; }
-button { font: inherit; padding: 2px 10px; cursor: pointer; }
-button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
-.outcome { font-weight: 600; }
-.outcome.good { color: var(--good); }
-.outcome.bad { color: var(--bad); }
-.history { margin: 0; padding-left: 1.4em; color: var(--muted); font-size: 0.9rem; }
-.results { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-variant-numeric: tabular-nums; }
-.results dd { margin: 0; text-align: right; }
-.board th, .board td { vertical-align: top; }
-.board .sub { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
-.cell { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); text-align: left; font-variant-numeric: tabular-nums; }
-.cell .tce { font-weight: 600; }
-.cell.good .tce { color: var(--good); }
-.cell.ok .tce { color: var(--ok); }
-.cell.bad .tce { color: var(--bad); }
-.cell .status { font-size: 0.8rem; font-weight: 600; min-height: 1.1em; }
-.cell.talking { border-color: var(--fg); border-width: 2px; }
-.cell.fixed { border-color: var(--good); border-width: 2px; }
-.cell.fixed .status { color: var(--good); }
-.cell.failed .status { color: var(--bad); }
-.cell:disabled { cursor: default; opacity: 0.55; }
-.cell.fixed:disabled, .cell.failed:disabled, .cell.talking:disabled { opacity: 1; }
-.cell.nofit { border: none; color: var(--muted); opacity: 0.6; padding-left: 8px; }
-.budget { margin: 0 0 8px; }
-.budget.empty strong { color: var(--bad); }
-.totals { margin-top: 1rem; font-size: 1.1rem; }
+h2 { margin: 1.4rem 0 0.4rem; font-size: 1.1rem; }
+h3 { margin: 1rem 0 0.3rem; font-size: 1rem; }
+ul { padding-left: 1.2em; }
+li { margin: 4px 0; }
+li > button { text-align: left; }
+button, select, input { font: inherit; }
+button[aria-current='true'] { font-weight: 600; }
+pre { white-space: pre-wrap; font: inherit; }
+table { border-collapse: collapse; display: block; overflow-x: auto; }
+th, td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
