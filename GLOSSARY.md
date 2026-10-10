@@ -76,6 +76,10 @@ this game gets its name.
 **Freight**: The money a charterer pays the shipowner for carrying a cargo. In
 dry bulk it is usually quoted in US dollars per tonne of cargo.
 
+**Freight index**: A daily published rate for a standard route and ship size,
+such as the Baltic Exchange's routes for Capesizes from Brazil to China.
+Brokers read them each morning to see where the market is.
+
 **Knot**: A speed of one nautical mile per hour. A ship doing 13 knots covers
 13 × 24 = 312 nautical miles a day.
 

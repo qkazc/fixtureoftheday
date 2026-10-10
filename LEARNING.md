@@ -79,6 +79,14 @@ Places where the game deliberately differs from reality, and why.
 - **Fixed effort by ship size.** Real effort depends on the client, the
   cargo's complications, and how many people are chasing the same ship.
 
+### Morning brief (`engine/briefing.ts`)
+- **Hints are always true.** Each news line comes from the day's real data
+  (the contest, the keenest owner, the most eager charterer, the latest
+  ship, the fuel price). Real market gossip is often wrong or self-serving.
+- **The index only moves with fuel.** Indicative rates change day to day
+  only because bunker prices change. Real indices move with supply and
+  demand: ships, cargoes, weather, congestion and sentiment.
+
 ## Placeholder numbers
 
 Values we made up or estimated roughly, to replace with better-sourced
@@ -111,6 +119,9 @@ figures later.
   distraction takes 1 h, is due by 10:00 and pays $1,500; ships open 0-6
   days out; laycans are 3 days wide and end 1-4 days after the matching
   ship can arrive.
+- **Morning brief** (`engine/briefing.ts`): 3-4 news lines (always the
+  contest, plus 2-3 of the others); indicative rates use a mid-size cargo
+  and the 2,000 nm typical ballast leg.
 
 ## Notes
 

@@ -1,4 +1,5 @@
 // Public entry point for the game engine. Pure TypeScript: no DOM, no I/O.
+export * from './briefing';
 export * from './day';
 export * from './inbox';
 export * from './market';

@@ -211,6 +211,14 @@ export function seededShare(text: string, [min, max]: readonly [number, number])
   return min + createRng(hashSeed(text))() * (max - min);
 }
 
+/** A ship owner's hidden floor, as a share of the class market TCE. Lower means keener to fix. */
+export const ownerFloorShare = (market: DailyMarket, ship: ShipOffer): number =>
+  seededShare(`${market.date}|owner|${ship.id}`, OWNER_FLOOR_RANGE);
+
+/** A charterer's hidden ceiling, as a share of the market rate. Higher means more willing to pay. */
+export const chartererCeilingShare = (market: DailyMarket, cargo: CargoOrder): number =>
+  seededShare(`${market.date}|charterer|${cargo.id}`, CHARTERER_CEILING_RANGE);
+
 /**
  * Each owner's floor and each charterer's ceiling for one ship-cargo pair.
  * PLACEHOLDER: the ranges are tuned for play.
@@ -221,8 +229,8 @@ export function negotiationLimits(
   cargo: CargoOrder,
 ): NegotiationLimits {
   const spec = VESSEL_CLASSES[ship.vesselClass];
-  const floorShare = seededShare(`${market.date}|owner|${ship.id}`, OWNER_FLOOR_RANGE);
-  const ceilingShare = seededShare(`${market.date}|charterer|${cargo.id}`, CHARTERER_CEILING_RANGE);
+  const floorShare = ownerFloorShare(market, ship);
+  const ceilingShare = chartererCeilingShare(market, cargo);
   return {
     ownerFloorRate: rateForTce(
       cargo,

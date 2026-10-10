@@ -8,6 +8,7 @@ import {
   DISTRACTION_PAYOUT_USD,
   endDay,
   enquiryStatus,
+  generateBriefing,
   handleDistraction,
   hoursLeft,
   research,
@@ -21,7 +22,7 @@ import {
   type EnquiryEmail,
   type Inbox,
 } from '../engine';
-import { formatClass, formatNm, formatUsd, formatUsdPerDay } from './format';
+import { formatClass, formatCommodity, formatNm, formatUsd, formatUsdPerDay } from './format';
 import {
   blockMessage,
   cargoLabel,
@@ -55,6 +56,8 @@ function button(label: string, onClick: () => void, attrs: Attrs = {}): HTMLButt
 
 export function renderGame(root: HTMLElement, inbox: Inbox): void {
   let day: DayState = startDay();
+  /** The morning brief comes first; the inbox opens when the day starts. */
+  let started = false;
   let openId: string | null = null;
   const read = new Set<string>();
   /** Last message shown under each email (the result of its last action). */
@@ -73,6 +76,10 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
   }
 
   function render(): void {
+    if (!started) {
+      root.replaceChildren(el('h1', {}, 'Fixture of the Day'), briefView());
+      return;
+    }
     root.replaceChildren(
       el('h1', {}, 'Fixture of the Day'),
       el(
@@ -82,6 +89,61 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
         day.ended ? '' : button('End day', () => ((day = endDay(day)), render())),
       ),
       ...(day.ended ? [summaryView()] : [inboxList(), openId ? emailView(openId) : el('p', {}, 'Open an email to read it.')]),
+    );
+  }
+
+  function briefView(): HTMLElement {
+    const b = generateBriefing(inbox);
+    const signed = (n: number) => (n === 0 ? 'unchanged' : `${n > 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`);
+    return el(
+      'section',
+      { 'aria-label': 'Morning brief' },
+      el('p', {}, `Morning brief · ${calendarDay(inbox.date, 0)} ${inbox.date.slice(0, 4)} · before 09:00`),
+      el('h2', {}, 'Overnight news'),
+      el('ul', {}, ...b.news.map((n) => el('li', {}, n.text))),
+      el('h2', {}, 'Indicative rates'),
+      el('p', {}, 'Today’s freight index: a typical cargo on each route, change since yesterday.'),
+      el(
+        'table',
+        {},
+        el('thead', {}, el('tr', {}, ...['Route', 'Cargo', 'Size', 'Rate', 'Change'].map((h) => el('th', {}, h)))),
+        el(
+          'tbody',
+          {},
+          ...b.routeRates.map((r) =>
+            el(
+              'tr',
+              {},
+              el('td', {}, `${PORTS[r.trade.loadPort].name} to ${PORTS[r.trade.dischargePort].name}`),
+              el('td', {}, formatCommodity(r.trade.commodity)),
+              el('td', {}, formatClass(r.trade.vesselClass)),
+              el('td', {}, `$${r.rateUsdPerTonne.toFixed(2)}/t`),
+              el('td', {}, signed(r.changeUsdPerTonne)),
+            ),
+          ),
+        ),
+      ),
+      el('h2', {}, 'Ship positions'),
+      el(
+        'table',
+        {},
+        el('thead', {}, el('tr', {}, ...['Ship', 'Size', 'Open', 'From'].map((h) => el('th', {}, h)))),
+        el(
+          'tbody',
+          {},
+          ...b.positions.map((ship) =>
+            el(
+              'tr',
+              {},
+              el('td', {}, ship.name),
+              el('td', {}, `${formatClass(ship.vesselClass)}, ${ship.dwt.toLocaleString('en-US')} dwt`),
+              el('td', {}, PORTS[ship.openPort].name),
+              el('td', {}, calendarDay(inbox.date, ship.openDay)),
+            ),
+          ),
+        ),
+      ),
+      el('p', {}, button('Start the day (09:00)', () => ((started = true), render()))),
     );
   }
 

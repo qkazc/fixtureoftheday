@@ -77,7 +77,7 @@ const CHARTERERS: Record<CargoOrder['commodity'], readonly string[]> = {
   bauxite: ['Kestrel Bauxite'],
 };
 const OWNERS = ['Albatross Bulk', 'Tern Shipping', 'Harbour Light Carriers', 'Westwind Bulk'];
-const REGIONS: Record<PortId, string> = {
+export const REGIONS: Record<PortId, string> = {
   portHedland: 'Western Australia',
   newcastle: 'eastern Australia',
   tubarao: 'Brazil',
@@ -89,8 +89,8 @@ const REGIONS: Record<PortId, string> = {
   mundra: 'India',
   rotterdam: 'northern Europe',
 };
-const CLASS_NAMES: Record<VesselClass, string> = { supramax: 'Supramax', panamax: 'Panamax', capesize: 'Capesize' };
-const COMMODITY_NAMES: Record<CargoOrder['commodity'], string> = {
+export const CLASS_NAMES: Record<VesselClass, string> = { supramax: 'Supramax', panamax: 'Panamax', capesize: 'Capesize' };
+export const COMMODITY_NAMES: Record<CargoOrder['commodity'], string> = {
   ironOre: 'iron ore',
   coal: 'coal',
   grain: 'grain',
@@ -167,7 +167,7 @@ export function generateInbox(date: string): Inbox {
     kind: 'brokerNote',
     from: 'Sam, senior broker',
     subject: 'Market colour',
-    body: [brokerHint(market)],
+    body: [brokerTip(market, enquiries)],
     deadlineHour: null,
     effortHours: 0,
     approxCommissionUsd: 0,
@@ -194,22 +194,28 @@ export function generateInbox(date: string): Inbox {
 }
 
 /**
- * One line of market colour, built from a real feature of the day: the size
- * of ship and region where one ship suits two cargoes. A hint, not a rule.
+ * The senior broker's one line: points at the biggest commission on the
+ * desk today. A nudge to prioritise, not a rule. (The overnight news in the
+ * morning brief carries the other hints.)
  */
-function brokerHint(market: DailyMarket): string {
-  for (const cargo of market.cargoes) {
-    const rival = market.cargoes.find(
-      (c) =>
-        c !== cargo &&
-        c.vesselClass === cargo.vesselClass &&
-        distanceNm(c.loadPort, cargo.loadPort) <= NEARBY_OPEN_NM,
+function brokerTip(market: DailyMarket, enquiries: readonly Omit<EnquiryEmail, 'id'>[]): string {
+  const biggest = [...enquiries].sort((a, b) => b.approxCommissionUsd - a.approxCommissionUsd)[0]!;
+  const cargo = market.cargoes.find((c) => c.id === biggest.cargoId)!;
+  return `Biggest commission on the desk today is the ${COMMODITY_NAMES[cargo.commodity]} from ${PORTS[cargo.loadPort].name} to ${PORTS[cargo.dischargePort].name}. Don't let it slip.`;
+}
+
+/**
+ * The day's contest pair: two same-size cargoes loading near each other,
+ * which one well-placed ship suits. The market guarantees one exists.
+ */
+export function contestPair(market: DailyMarket): [CargoOrder, CargoOrder] {
+  for (const a of market.cargoes) {
+    const b = market.cargoes.find(
+      (c) => c !== a && c.vesselClass === a.vesselClass && distanceNm(c.loadPort, a.loadPort) <= NEARBY_OPEN_NM,
     );
-    if (rival) {
-      return `${CLASS_NAMES[cargo.vesselClass]} ships look tight around ${REGIONS[cargo.loadPort]} this week. Don't waste a good ship.`;
-    }
+    if (b) return [a, b];
   }
-  return 'Quiet day. Check the position lists before you commit anything.';
+  throw new Error(`no contest pair on ${market.date}`);
 }
 
 export function findEmail(inbox: Inbox, id: string): Email {
