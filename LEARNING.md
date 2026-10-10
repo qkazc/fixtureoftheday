@@ -42,7 +42,6 @@ figures later.
 - **Test voyage**: 55,000 t at $20/t, 5% commission, 500 nm ballast +
   6,000 nm laden, 8 port days, $150,000 port costs, bunkers $600/t.
   Plausible, not sourced.
-
 - **Port distances** (`engine/ports.ts`): game estimates, approximate,
   rounded to the nearest 50 nm. Plausible for the usual routes but not from
   official distance tables.

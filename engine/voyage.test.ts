@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateVoyage, type Cargo, type Market, type Route, type Vessel } from './voyage';
+import { buildRoute, calculateVoyage, type Cargo, type Market, type Route, type Vessel } from './voyage';
 
 // PLACEHOLDER: all figures below are plausible for a Supramax but chosen by
 // hand, not sourced from real market data.
@@ -136,5 +136,50 @@ describe('calculateVoyage', () => {
         calculateVoyage(supramax, { ...cargo, commissionPct: 101 }, route, market),
       ).toThrow(/commissionPct/);
     });
+  });
+});
+
+describe('buildRoute', () => {
+  it('takes ballast and laden distances from the port table', () => {
+    const r = buildRoute(
+      { openPort: 'qingdao', loadPort: 'richardsBay', dischargePort: 'mundra' },
+      8,
+      150_000,
+    );
+    expect(r).toEqual({
+      ballastDistanceNm: 7_250,
+      ladenDistanceNm: 3_850,
+      portDays: 8,
+      portCostsUsd: 150_000,
+    });
+  });
+
+  it('has no ballast leg when the ship opens at the load port', () => {
+    const r = buildRoute(
+      { openPort: 'richardsBay', loadPort: 'richardsBay', dischargePort: 'mundra' },
+      8,
+      150_000,
+    );
+    expect(r.ballastDistanceNm).toBe(0);
+  });
+
+  it('rejects loading and discharging at the same port', () => {
+    expect(() =>
+      buildRoute({ openPort: 'qingdao', loadPort: 'mundra', dischargePort: 'mundra' }, 8, 0),
+    ).toThrow(/load and discharge port/);
+  });
+
+  it('shows that a nearby ship earns more on the same cargo', () => {
+    // Richards Bay coal to India: a ship open in Mundra (3,850 nm ballast)
+    // beats one open in Qingdao (7,250 nm ballast).
+    const coal: Cargo = { quantityTonnes: 55_000, freightRateUsdPerTonne: 18, commissionPct: 5 };
+    const tce = (openPort: 'mundra' | 'qingdao') =>
+      calculateVoyage(
+        supramax,
+        coal,
+        buildRoute({ openPort, loadPort: 'richardsBay', dischargePort: 'mundra' }, 8, 150_000),
+        market,
+      ).tceUsdPerDay;
+    expect(tce('mundra')).toBeGreaterThan(tce('qingdao'));
   });
 });

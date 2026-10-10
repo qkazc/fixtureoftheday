@@ -12,6 +12,8 @@
 //   draft limits are ignored.
 // - No canal transits or tolls.
 
+import { distanceNm, type PortId } from './ports';
+
 export interface Vessel {
   /** Deadweight: total tonnes the ship can carry (cargo + fuel + stores). */
   dwt: number;
@@ -69,6 +71,30 @@ export interface VoyageResult {
 }
 
 const HOURS_PER_DAY = 24;
+
+export interface VoyagePorts {
+  /** Where the ship becomes free (its open position). */
+  openPort: PortId;
+  loadPort: PortId;
+  dischargePort: PortId;
+}
+
+/**
+ * Builds a Route from port names using the distance table: the ballast leg
+ * runs from the open port to the load port, the laden leg from the load port
+ * to the discharge port.
+ */
+export function buildRoute(ports: VoyagePorts, portDays: number, portCostsUsd: number): Route {
+  if (ports.loadPort === ports.dischargePort) {
+    throw new RangeError(`load and discharge port are both ${ports.loadPort}`);
+  }
+  return {
+    ballastDistanceNm: distanceNm(ports.openPort, ports.loadPort),
+    ladenDistanceNm: distanceNm(ports.loadPort, ports.dischargePort),
+    portDays,
+    portCostsUsd,
+  };
+}
 
 export function calculateVoyage(
   vessel: Vessel,
