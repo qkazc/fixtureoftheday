@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   CARGOES_PER_DAY,
+  CHARTERER_CEILING_RANGE,
+  hasDealZone,
+  negotiationLimits,
+  OWNER_FLOOR_RANGE,
   generateMarket,
   CLOSE_OPEN_NM,
   MARKET_COMMISSION_PCT,
@@ -12,7 +16,6 @@ import {
   type ShipOffer,
 } from './market';
 import { distanceNm, PORTS } from './ports';
-import { SATISFACTION_BAND } from './scoring';
 import { VESSEL_CLASSES } from './vessels';
 import { calculateVoyage } from './voyage';
 
@@ -118,25 +121,37 @@ describe('generateMarket', () => {
   });
 
   it('gives every cargo at least one ship with a positive deal zone, on 100 dates', () => {
-    // Deal zone: rates both sides could accept. The owner needs a TCE above
-    // (1 - band) × market; the charterer won't pay above (1 + band) × market rate.
+    // Deal zone: some rate is at or above the owner's hidden floor and at or
+    // below the charterer's hidden ceiling (see negotiationLimits).
     for (const date of DATES) {
       const m = generateMarket(date);
       for (const cargo of m.cargoes) {
-        const spec = VESSEL_CLASSES[cargo.vesselClass];
-        const chartererMax = cargo.marketRateUsdPerTonne * (1 + SATISFACTION_BAND);
-        const hasDealZone = m.ships.some((ship) => {
-          if (ship.vesselClass !== cargo.vesselClass) return false;
-          const ownerMin = rateForTce(
-            cargo,
-            cargo.quantityTonnes,
-            m.bunkerPriceUsdPerTonne,
-            spec.marketTceUsdPerDay * (1 - SATISFACTION_BAND),
-            distanceNm(ship.openPort, cargo.loadPort),
-          );
-          return ownerMin < chartererMax;
-        });
-        expect(hasDealZone, `${date} cargo ${cargo.id}`).toBe(true);
+        const winnable = m.ships.some(
+          (ship) => ship.vesselClass === cargo.vesselClass && hasDealZone(m, ship, cargo),
+        );
+        expect(winnable, `${date} cargo ${cargo.id}`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps hidden limits inside their ranges', () => {
+    for (const date of DATES.slice(0, 20)) {
+      const m = generateMarket(date);
+      for (const cargo of m.cargoes) {
+        for (const ship of m.ships.filter((s) => s.vesselClass === cargo.vesselClass)) {
+          const l = negotiationLimits(m, ship, cargo);
+          const ceilingShare = l.chartererCeilingRate / cargo.marketRateUsdPerTonne;
+          expect(ceilingShare).toBeGreaterThanOrEqual(CHARTERER_CEILING_RANGE[0]);
+          expect(ceilingShare).toBeLessThanOrEqual(CHARTERER_CEILING_RANGE[1]);
+          // The owner's floor rate earns a TCE inside the floor range.
+          const spec = VESSEL_CLASSES[ship.vesselClass];
+          const floorRateAtMin = rateForTce(cargo, cargo.quantityTonnes, m.bunkerPriceUsdPerTonne,
+            spec.marketTceUsdPerDay * OWNER_FLOOR_RANGE[0], distanceNm(ship.openPort, cargo.loadPort));
+          const floorRateAtMax = rateForTce(cargo, cargo.quantityTonnes, m.bunkerPriceUsdPerTonne,
+            spec.marketTceUsdPerDay * OWNER_FLOOR_RANGE[1], distanceNm(ship.openPort, cargo.loadPort));
+          expect(l.ownerFloorRate).toBeGreaterThanOrEqual(floorRateAtMin - 1e-9);
+          expect(l.ownerFloorRate).toBeLessThanOrEqual(floorRateAtMax + 1e-9);
+        }
       }
     }
   });

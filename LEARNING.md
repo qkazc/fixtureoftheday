@@ -46,14 +46,26 @@ Places where the game deliberately differs from reality, and why.
   ship needs, which is why a well-placed ship can beat the market.
 
 ### Scoring (`engine/scoring.ts`)
-- **Fixed, hidden walk-away points.** The owner refuses below 80% of the
-  market TCE and the charterer above 120% of the market rate, every time.
-  Real walk-away points vary by client and by how badly each side needs the
-  deal, and there is no counter-offer yet (negotiation comes next).
+- **Backstop limits.** Scoring refuses any rate below 80% of market TCE or
+  above 120% of the market rate. Negotiation's hidden limits sit inside
+  these, so an agreed rate is never refused.
 - **Satisfaction is only about money.** Real relationships also depend on
   reliability, timing and how disputes were handled.
 - **One broker, fixed 1.25%.** Deals often go through two or more brokers
   who split the commission.
+
+### Negotiation (`engine/negotiation.ts`)
+- **One message to both sides.** The broker sends the same proposed rate to
+  the owner and the charterer each round. Real brokers relay separate
+  messages, and tune what they tell each side.
+- **Fixed concessions.** A side that says no moves halfway from its current
+  position to its hidden limit. Real clients concede unevenly, bluff, and
+  react to how a proposal is pitched.
+- **Last call.** In round 3 each side takes any rate it can live with
+  rather than lose the deal. Real negotiations have no fixed last round;
+  deals die from time pressure or a better alternative turning up.
+- **Moods last a day.** Each owner's floor and charterer's ceiling come from
+  the day's seed. Real clients remember how you treated them.
 
 ## Placeholder numbers
 
@@ -78,6 +90,9 @@ figures later.
 - **Scoring** (`engine/scoring.ts`): ±20% satisfaction bands, tuned for
   gameplay. Brokerage of 1.25% is a common real-world figure, not sourced
   for this project.
+- **Negotiation** (`engine/market.ts`, `engine/negotiation.ts`): owner
+  floors 80–95% of market TCE, charterer ceilings 105–120% of market rate,
+  openings 12% either side of market, 50% concession per counter, 3 rounds.
 
 ## Notes
 

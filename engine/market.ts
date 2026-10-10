@@ -87,18 +87,85 @@ export function generateMarket(date: string): DailyMarket {
   // One ship per cargo, of the right class and open within NEARBY_OPEN_NM of
   // its load port, so every day has a sensible match. Plus one spare ship,
   // open anywhere, as a decoy. Shuffled so the order gives nothing away.
-  const placements: { vesselClass: VesselClass; openPort: PortId }[] = [
-    ...cargoes.map((c) => ({ vesselClass: c.vesselClass, openPort: nearbyPort(rng, c.loadPort) })),
+  const placements: { vesselClass: VesselClass; openPort: PortId; forCargo?: CargoOrder }[] = [
+    ...cargoes.map((c) => ({
+      vesselClass: c.vesselClass,
+      openPort: nearbyPort(rng, c.loadPort),
+      forCargo: c,
+    })),
     { vesselClass: pick(rng, VESSEL_CLASS_IDS), openPort: pick(rng, PORT_IDS) },
   ];
   const names = shuffle(rng, SHIP_NAMES);
-  const ships = shuffle(rng, placements).map((placement, i) => ({
-    id: `S${i + 1}`,
-    name: names[i]!,
-    ...placement,
+  const placed = shuffle(rng, placements).map((p, i) => ({
+    ship: { id: `S${i + 1}`, name: names[i]!, vesselClass: p.vesselClass, openPort: p.openPort },
+    forCargo: p.forCargo,
   }));
+  const market: DailyMarket = { date, bunkerPriceUsdPerTonne, cargoes, ships: placed.map((p) => p.ship) };
 
-  return { date, bunkerPriceUsdPerTonne, cargoes, ships };
+  // Clients' hidden limits can leave a cargo with no ship it could be fixed
+  // with. If so, move its guaranteed ship to the load port, and recheck until
+  // every cargo is winnable (each move only ever fixes things for its cargo).
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const cargo of cargoes) {
+      const winnable = market.ships.some(
+        (ship) => ship.vesselClass === cargo.vesselClass && hasDealZone(market, ship, cargo),
+      );
+      const own = placed.find((p) => p.forCargo === cargo)!.ship;
+      if (!winnable && own.openPort !== cargo.loadPort) {
+        own.openPort = cargo.loadPort;
+        changed = true;
+      }
+    }
+  }
+  return market;
+}
+
+/** Owner floor: lowest acceptable TCE, as a share of the class market TCE. */
+export const OWNER_FLOOR_RANGE: readonly [number, number] = [0.8, 0.95];
+/** Charterer ceiling: highest acceptable rate, as a share of the market rate. */
+export const CHARTERER_CEILING_RANGE: readonly [number, number] = [1.05, 1.2];
+
+export interface NegotiationLimits {
+  /** Lowest rate the owner will accept ($/t). Hidden from the player. */
+  ownerFloorRate: number;
+  /** Highest rate the charterer will pay ($/t). Hidden from the player. */
+  chartererCeilingRate: number;
+}
+
+/** A number in [min, max] fixed by the text, so each client keeps the same mood all day. */
+function seededShare(text: string, [min, max]: readonly [number, number]): number {
+  return min + createRng(hashSeed(text))() * (max - min);
+}
+
+/**
+ * Each owner's floor and each charterer's ceiling for one ship-cargo pair.
+ * PLACEHOLDER: the ranges are tuned for play.
+ */
+export function negotiationLimits(
+  market: DailyMarket,
+  ship: ShipOffer,
+  cargo: CargoOrder,
+): NegotiationLimits {
+  const spec = VESSEL_CLASSES[ship.vesselClass];
+  const floorShare = seededShare(`${market.date}|owner|${ship.id}`, OWNER_FLOOR_RANGE);
+  const ceilingShare = seededShare(`${market.date}|charterer|${cargo.id}`, CHARTERER_CEILING_RANGE);
+  return {
+    ownerFloorRate: rateForTce(
+      cargo,
+      cargo.quantityTonnes,
+      market.bunkerPriceUsdPerTonne,
+      spec.marketTceUsdPerDay * floorShare,
+      distanceNm(ship.openPort, cargo.loadPort),
+    ),
+    chartererCeilingRate: cargo.marketRateUsdPerTonne * ceilingShare,
+  };
+}
+
+/** True if some rate would satisfy both the owner's floor and the charterer's ceiling. */
+export function hasDealZone(market: DailyMarket, ship: ShipOffer, cargo: CargoOrder): boolean {
+  const l = negotiationLimits(market, ship, cargo);
+  return l.ownerFloorRate <= l.chartererCeilingRate;
 }
 
 /** A port near the load port: half the time close, half the time medium distance. */
