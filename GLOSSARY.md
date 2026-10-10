@@ -49,6 +49,10 @@ deeper, so a shallow port or channel can stop a ship from loading fully.
 **Dry bulk**: Unpackaged cargo loaded loose into a ship's holds, such as iron
 ore, coal, grain, bauxite or fertiliser.
 
+**Fixture**: A concluded charter deal: owner and charterer have agreed the
+ship, cargo, rate and terms. Brokers say a ship has been "fixed". It's where
+this game gets its name.
+
 **Freight**: The money a charterer pays the shipowner for carrying a cargo. In
 dry bulk it is usually quoted in US dollars per tonne of cargo.
 
@@ -57,6 +61,10 @@ dry bulk it is usually quoted in US dollars per tonne of cargo.
 
 **Laden leg**: The part of a voyage where the ship is carrying cargo, from the
 load port to the discharge port.
+
+**Laycan**: Short for laydays/cancelling: the date window in which the ship
+must arrive at the load port. Too early and the charterer needn't load it yet;
+after the last day the charterer can cancel.
 
 **Load port**: The port where the cargo is loaded onto the ship.
 
