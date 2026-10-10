@@ -10,8 +10,10 @@ import {
   quoteRange,
   hoursLeft,
   startDay,
+  solveDay,
   summarizeDay,
   PORTS,
+  type BestDay,
   type DayState,
   type EnquiryEmail,
   type FixOutcome,
@@ -32,6 +34,7 @@ import {
 } from './save';
 import { shareText } from './share';
 import {
+  bestPlanText,
   blockMessage,
   cargoLabel,
   clockLabel,
@@ -40,6 +43,7 @@ import {
   fixOutcomeMessage,
   fixtureReasonText,
   hoursLabel,
+  parPercent,
   roughUsd,
   skippedText,
 } from './text';
@@ -407,8 +411,8 @@ export function renderGame(root: HTMLElement, inbox: Inbox, store: StorageLike |
   }
 
   /** The spoiler-free result, with a button to copy it for sharing. */
-  function shareBox(summary: ReturnType<typeof summarizeDay>): HTMLElement {
-    const text = shareText(inbox, summary);
+  function shareBox(summary: ReturnType<typeof summarizeDay>, best: BestDay): HTMLElement {
+    const text = shareText(inbox, summary, best.score);
     const pre = el('pre', { class: 'share', id: 'share-text' }, text);
     const status = el('span', { class: 'muted', role: 'status' });
     const selectText = () => {
@@ -439,6 +443,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox, store: StorageLike |
 
   function summaryView(): HTMLElement {
     const s = summarizeDay(inbox, day);
+    const best = solveDay(inbox);
     const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v)}/100`);
     const shipName = (id: string) => inbox.market.ships.find((x) => x.id === id)!.name;
     const cargoOf = (cargoId: string) => inbox.market.cargoes.find((c) => c.id === cargoId)!;
@@ -446,7 +451,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox, store: StorageLike |
     return el(
       'div',
       {},
-      shareBox(s),
+      shareBox(s, best),
       ...endOfDayText(s, cargoOf).map((line) => el('p', {}, line)),
       el(
         'ul',
@@ -454,7 +459,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox, store: StorageLike |
         el('li', {}, `Fixtures made: ${s.fixtures.length}`),
         el('li', {}, `Commission earned: ${formatUsd(s.totalCommissionUsd)}`),
         el('li', {}, `Owner satisfaction: ${pct(s.avgOwnerSatisfaction)} · Charterer satisfaction: ${pct(s.avgChartererSatisfaction)}`),
-        el('li', {}, `Score: ${Math.round(s.totalScore).toLocaleString('en-US')}`),
+        el('li', {}, `Score: ${Math.round(s.totalScore).toLocaleString('en-US')} (${parPercent(s.totalScore, best.score)}% of the best possible)`),
         el('li', {}, `Emails skipped: ${skippedEmails}`),
       ),
       el('h3', {}, 'Fixtures'),
@@ -482,6 +487,14 @@ export function renderGame(root: HTMLElement, inbox: Inbox, store: StorageLike |
             ...s.skippedEnquiries.map((x) => el('li', {}, `${cargoLabel(cargoOf(x.email.cargoId))}: ${skippedText(x)}`)),
             ...(s.distractionSkipped ? [el('li', {}, `The urgent small parcel: worth only about ${formatUsd(DISTRACTION_PAYOUT_USD)}, so skipping it was cheap.`)] : []),
           ),
+      el('h3', {}, 'The best possible day'),
+      el(
+        'p',
+        { class: 'muted' },
+        `Knowing every client's hidden limit, this plan scores ${Math.round(best.score).toLocaleString('en-US')} ` +
+          `(${formatUsd(best.commissionUsd)} commission). Nobody can see those limits, so it's a ceiling, not a target.`,
+      ),
+      el('ol', { class: 'best-plan' }, ...bestPlanText(inbox, best).map((line) => el('li', {}, line))),
     );
   }
 

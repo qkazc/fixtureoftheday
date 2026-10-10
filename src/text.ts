@@ -3,7 +3,10 @@
 
 import {
   DAY_END_HOUR,
+  DAY_START_HOUR,
+  type BestDay,
   type DaySummary,
+  type Inbox,
   PORTS,
   type BlockReason,
   type CargoOrder,
@@ -115,3 +118,28 @@ export function endOfDayText(summary: DaySummary, cargoOf: (cargoId: string) => 
   return lines;
 }
 
+
+/** The player's score as a whole percentage of the best possible day (at most 100). */
+export function parPercent(score: number, bestScore: number): number {
+  if (bestScore <= 0) return 100;
+  return Math.min(100, Math.round((score / bestScore) * 100));
+}
+
+/** The best possible day as a timed to-do list: "10:00 Fix … with … at $9.80/t." */
+export function bestPlanText(inbox: Inbox, best: BestDay): string[] {
+  const lines: string[] = [];
+  let clock = DAY_START_HOUR;
+  const distraction = inbox.emails.find((e) => e.kind === 'distraction');
+  if (best.handlesDistraction && distraction) {
+    lines.push(`${clockLabel(clock)} Handle the urgent small parcel (${formatUsd(distraction.kind === 'distraction' ? distraction.payoutUsd : 0)}).`);
+    clock += distraction.effortHours;
+  }
+  for (const f of best.fixes) {
+    const email = inbox.emails.find((e) => e.id === f.emailId)!;
+    const cargo = inbox.market.cargoes.find((c) => email.kind === 'enquiry' && c.id === email.cargoId)!;
+    const ship = inbox.market.ships.find((x) => x.id === f.shipId)!;
+    lines.push(`${clockLabel(clock)} Fix ${cargoLabel(cargo)} with ${ship.name} at $${f.rateUsdPerTonne.toFixed(2)}/t.`);
+    clock += email.effortHours;
+  }
+  return lines;
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { generateInbox, summarizeDay, endDay, startDay, attemptFix, isWorkable, negotiationLimits, research, type EnquiryEmail, type Inbox } from '../engine';
+import { generateInbox, summarizeDay, endDay, startDay, attemptFix, isWorkable, negotiationLimits, research, solveDay, type BestDay, type EnquiryEmail, type Inbox } from '../engine';
 import {
+  bestPlanText,
   blockMessage,
   cargoLabel,
   clockLabel,
@@ -9,6 +10,7 @@ import {
   fixOutcomeMessage,
   fixtureReasonText,
   hoursLabel,
+  parPercent,
   roughUsd,
   skippedText,
 } from './text';
@@ -91,3 +93,30 @@ describe('endOfDayText', () => {
   });
 });
 
+
+describe('parPercent', () => {
+  it('rounds to a whole percentage and never passes 100', () => {
+    expect(parPercent(0, 1000)).toBe(0);
+    expect(parPercent(854, 1000)).toBe(85);
+    expect(parPercent(1000, 1000)).toBe(100);
+    expect(parPercent(1000.4, 1000)).toBe(100);
+    expect(parPercent(0, 0)).toBe(100);
+  });
+});
+
+describe('bestPlanText', () => {
+  const inbox = generateInbox('2026-10-10');
+
+  it('lists the best day as timed steps, one per fix', () => {
+    const best = solveDay(inbox);
+    const lines = bestPlanText(inbox, best);
+    expect(lines).toHaveLength(best.fixes.length + (best.handlesDistraction ? 1 : 0));
+    expect(lines[0]).toMatch(/^09:00 /);
+    for (const f of best.fixes) expect(lines.some((l) => l.includes(`at $${f.rateUsdPerTonne.toFixed(2)}/t.`))).toBe(true);
+  });
+
+  it('starts with the urgent parcel when the plan handles it', () => {
+    const best: BestDay = { score: 1, commissionUsd: 1, handlesDistraction: true, fixes: [] };
+    expect(bestPlanText(inbox, best)).toEqual(['09:00 Handle the urgent small parcel ($1,500).']);
+  });
+});

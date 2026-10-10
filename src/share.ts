@@ -3,6 +3,7 @@
 
 import { calendarDay, type DaySummary, type EnquiryEmail, type Inbox } from '../engine';
 import { formatUsd } from './format';
+import { parPercent } from './text';
 
 /**
  * One square per enquiry, soonest deadline first:
@@ -21,13 +22,15 @@ export function resultSquares(inbox: Inbox, summary: DaySummary): string {
     .join('');
 }
 
-export function shareText(inbox: Inbox, summary: DaySummary): string {
+/** `bestScore` is the best possible day's score (see solveDay), for the percentage. */
+export function shareText(inbox: Inbox, summary: DaySummary, bestScore: number): string {
   const enquiries = inbox.emails.filter((e) => e.kind === 'enquiry').length;
   const pct = (v: number | null) => (v === null ? '–' : String(Math.round(v)));
   return [
     `Fixture of the Day · ${calendarDay(inbox.date, 0)} ${inbox.date.slice(0, 4)}`,
     `⚓ ${summary.fixtures.length}/${enquiries} fixed · ${formatUsd(summary.totalCommissionUsd)} commission`,
-    `Owners ${pct(summary.avgOwnerSatisfaction)} · Charterers ${pct(summary.avgChartererSatisfaction)} · Score ${Math.round(summary.totalScore).toLocaleString('en-US')}`,
+    `Score ${Math.round(summary.totalScore).toLocaleString('en-US')} · ${parPercent(summary.totalScore, bestScore)}% of the best possible`,
+    `Owners ${pct(summary.avgOwnerSatisfaction)} · Charterers ${pct(summary.avgChartererSatisfaction)}`,
     resultSquares(inbox, summary),
   ].join('\n');
 }

@@ -7,7 +7,9 @@ rates both sides will accept, and get the deals done before their deadlines.
 You're scored on the commission you earn and on how satisfied the shipowners
 and charterers are.
 
-Everyone playing the same date gets the same day.
+Everyone playing the same date gets the same day. Each date's puzzle is
+drawn from its seed, and a draw where the obvious plan is already the best
+one is re-rolled (see `engine/daily.ts`).
 
 It's a side project for learning how the shipping industry works, so it
 favours plausible, clearly labelled numbers over precision. See
@@ -27,7 +29,9 @@ are placeholders.
    - Ships can only be fixed once a day, and enquiries are lost when there's
      no longer time to finish them before their deadline.
 3. **End of day**: what you fixed and why it scored what it did, what you
-   missed and which ship could have fixed it.
+   missed and which ship could have fixed it, and the best possible day
+   (what a broker who could see every hidden limit would have done) with
+   your score as a percentage of it.
 
 You get one attempt per day. Progress is saved in your browser (so a refresh
 doesn't lose it, but it doesn't follow you to another device), and the end
@@ -67,7 +71,13 @@ build on GitHub Actions (`.github/workflows/ci.yml`).
   - `inbox.ts`: the day's emails
   - `day.ts`: the 09:00-17:00 day as a pure state machine, plus the summary
   - `briefing.ts`: the morning brief
+  - `solver.ts`: the best possible day, by exhaustive search
+  - `daily.ts`: picks each date's puzzle, re-rolling dull draws
   - `random.ts`: the seeded random number generator
+
+  Any change that alters the puzzles must bump `GENERATOR_VERSION` in
+  `market.ts`: it is part of every seed, and saves from another version are
+  discarded. A fingerprint test in `daily.test.ts` fails as a reminder.
 - `src/`: the browser UI, in plain TypeScript and DOM with no framework.
   `view.ts` draws the screens, and `text.ts` builds the plain-language
   sentences (tested). `save.ts` keeps the day in local storage by saving the
