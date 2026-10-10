@@ -62,11 +62,14 @@ owner is a beginner in shipping, so teaching is part of every change.
 - `npm run test:watch`: tests in watch mode
 - `npm run typecheck`: typecheck the app and, separately, the engine (no DOM)
 - `npm run build`: typecheck and production build
+- `npm run build:page`: build, then pack into one self-contained HTML file
+  (`dist/fixture-of-the-day.html`), the file that gets published as a page
 
 Run `npm run typecheck && npm test` before every commit.
 
 ## Docs
 
+- `README.md`: what the game is, how to run it, and the code layout.
 - `GLOSSARY.md`: shipping terms in plain English.
 - `LEARNING.md`: running log of what we've learned about the industry,
   simplifications we've chosen, and placeholder numbers to revisit.
