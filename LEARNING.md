@@ -45,6 +45,15 @@ Places where the game deliberately differs from reality, and why.
   demand on each route, and they do price in the repositioning a typical
   ship needs, which is why a well-placed ship can beat the market.
 
+### Scoring (`engine/scoring.ts`)
+- **Nobody refuses a deal.** In reality an owner would turn down a rate
+  that loses money, and a charterer wouldn't pay far above market.
+  Refusals belong in a future negotiation step.
+- **Satisfaction is only about money.** Real relationships also depend on
+  reliability, timing and how disputes were handled.
+- **One broker, fixed 1.25%.** Deals often go through two or more brokers
+  who split the commission.
+
 ## Placeholder numbers
 
 Values we made up or estimated roughly, to replace with better-sourced
@@ -64,6 +73,9 @@ figures later.
   Panamax $14,000, Capesize $20,000 a day). Plausible, hand-picked.
 - **Market** (`engine/market.ts`): bunkers $550–650/t, 5% commission, ±10%
   rate noise, 2,000 nm typical ballast leg. Hand-picked.
+- **Scoring** (`engine/scoring.ts`): ±20% satisfaction bands, tuned for
+  gameplay. Brokerage of 1.25% is a common real-world figure, not sourced
+  for this project.
 
 ## Notes
 
@@ -86,3 +98,9 @@ is a skill.
 Freight is quoted gross, but the owner pays commissions out of it: address
 commission back to the charterer and brokerage to brokers. These count as
 voyage costs, so they lower TCE.
+
+### The broker's conflict of interest
+Brokerage is a percentage of the freight, so a higher rate pays the broker
+more, but it also upsets the charterer, who is just as much a client. In this
+game the score multiplies commission by both clients' satisfaction, so
+squeezing either side costs you.
