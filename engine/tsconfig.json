@@ -1,0 +1,10 @@
+{
+  // Stricter config for the engine: no DOM types, so any accidental use of
+  // window/document/fetch etc. fails to typecheck. Keeps the engine pure.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["."]
+}
