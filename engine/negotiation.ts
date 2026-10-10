@@ -1,27 +1,41 @@
-// Negotiating a fixture: the broker sends one proposed rate to both sides at
-// once, each side accepts or counters, and after MAX_ROUNDS without a deal
-// the cargo is lost for the day. Before the final round a side accepts only a
-// rate at least as good as its current position; in the final round ("last
-// call") it accepts anything within its limit rather than lose the deal.
+// Negotiating a fixture. Each round the broker either:
+// - sends a proposal: each side accepts if it meets their current position,
+//   otherwise counters part of the way towards their hidden limit; or
+// - makes a firm offer: each side accepts if it's within their hidden limit,
+//   and if either says no, the deal is dead.
+// The final round is always a last call, so a proposal there works like a
+// firm offer. After MAX_ROUNDS without a deal the cargo is lost for the day.
+// Every proposal or firm offer uses one of the day's PROPOSALS_PER_DAY.
 //
-// Each owner has a hidden floor and each charterer a hidden ceiling, drawn
-// from the day's seed, so the same day always negotiates the same way.
+// Each client has a hidden limit, an opening margin and a concession share,
+// all drawn from the day's seed, so the same day always negotiates the same
+// way, but meeting in the middle is not reliably the best play.
 //
 // SIMPLIFICATIONS (see LEARNING.md):
-// - Sides concede a fixed share of the gap to their limit each round.
+// - Each client concedes the same share of the gap every round.
 // - Nobody bluffs, remembers past days, or reacts to how far off you were.
-// - One proposal goes to both sides at once; real brokers relay separately.
-// PLACEHOLDER: limit ranges, opening margin and concession are tuned for play.
+// - One message goes to both sides at once; real brokers relay separately.
+// PLACEHOLDER: all ranges and counts here are tuned for play.
 
-import { negotiationLimits, type DailyMarket, type NegotiationLimits } from './market';
+import {
+  negotiationLimits,
+  seededShare,
+  type DailyMarket,
+  type NegotiationLimits,
+} from './market';
 
 export const MAX_ROUNDS = 3;
-/** Each counter moves this share of the way from the current position to the limit. */
-export const CONCESSION = 0.5;
-/** Openings: owners ask this much above market (or their floor), charterers bid this much below. */
-export const OPENING_MARGIN = 0.12;
+/** Proposals and firm offers the broker can send in a day, across all cargoes. */
+export const PROPOSALS_PER_DAY = 8;
+/** How far from its limit each side opens, as a share of the limit. */
+export const OPENING_MARGIN_RANGE: readonly [number, number] = [0.1, 0.35];
+/** Share of the gap to its limit a side gives up with each counter. */
+export const CONCESSION_RANGE: readonly [number, number] = [0.35, 0.65];
+
+export type RoundKind = 'proposal' | 'firm';
 
 export interface NegotiationRound {
+  kind: RoundKind;
   proposedRate: number;
   ownerAccepted: boolean;
   chartererAccepted: boolean;
@@ -31,6 +45,12 @@ export interface NegotiationRound {
 }
 
 export type NegotiationStatus = 'open' | 'agreed' | 'failed';
+
+/** Hidden per-client behaviour. The UI must not show any of this. */
+export interface NegotiationSecrets extends NegotiationLimits {
+  ownerConcession: number;
+  chartererConcession: number;
+}
 
 export interface Negotiation {
   shipId: string;
@@ -43,7 +63,7 @@ export interface Negotiation {
   agreedRate: number | null;
   history: NegotiationRound[];
   /** Kept for the engine; the UI must not show these. */
-  limits: NegotiationLimits;
+  limits: NegotiationSecrets;
 }
 
 const roundUp = (rate: number) => Math.ceil(rate * 20 - 1e-9) / 20;
@@ -57,56 +77,75 @@ export function startNegotiation(market: DailyMarket, shipId: string, cargoId: s
   if (ship.vesselClass !== cargo.vesselClass) {
     throw new Error(`ship ${ship.id} is a ${ship.vesselClass} but cargo ${cargo.id} needs a ${cargo.vesselClass}`);
   }
-  const limits = negotiationLimits(market, ship, cargo);
-  const market$ = cargo.marketRateUsdPerTonne;
+  const { ownerFloorRate, chartererCeilingRate } = negotiationLimits(market, ship, cargo);
+  const key = `${market.date}|${ship.id}|${cargo.id}`;
+  const ownerMargin = seededShare(`${key}|ownerOpening`, OPENING_MARGIN_RANGE);
+  const chartererMargin = seededShare(`${key}|chartererOpening`, OPENING_MARGIN_RANGE);
   return {
     shipId,
     cargoId,
     status: 'open',
-    ownerOffer: roundUp(Math.max(limits.ownerFloorRate, market$) * (1 + OPENING_MARGIN)),
-    chartererBid: roundDown(Math.min(limits.chartererCeilingRate, market$) * (1 - OPENING_MARGIN)),
+    ownerOffer: roundUp(ownerFloorRate * (1 + ownerMargin)),
+    chartererBid: roundDown(chartererCeilingRate * (1 - chartererMargin)),
     agreedRate: null,
     history: [],
-    limits,
+    limits: {
+      ownerFloorRate,
+      chartererCeilingRate,
+      ownerConcession: seededShare(`${key}|ownerConcession`, CONCESSION_RANGE),
+      chartererConcession: seededShare(`${key}|chartererConcession`, CONCESSION_RANGE),
+    },
   };
 }
 
-/** Sends one proposed rate to both sides and returns the negotiation after their replies. */
+/** Sends a proposal to both sides. In the final round it works like a firm offer. */
 export function propose(n: Negotiation, rateUsdPerTonne: number): Negotiation {
+  return isFinalRound(n) ? firmOffer(n, rateUsdPerTonne) : play(n, rateUsdPerTonne, 'proposal');
+}
+
+/** Take it or leave it: agreed if inside both hidden limits, otherwise the deal is dead. */
+export function firmOffer(n: Negotiation, rateUsdPerTonne: number): Negotiation {
+  return play(n, rateUsdPerTonne, 'firm');
+}
+
+function play(n: Negotiation, rate: number, kind: RoundKind): Negotiation {
   if (n.status !== 'open') throw new Error(`negotiation is already ${n.status}`);
-  if (!Number.isFinite(rateUsdPerTonne) || rateUsdPerTonne <= 0) {
-    throw new RangeError(`rate must be a positive number, got ${rateUsdPerTonne}`);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new RangeError(`rate must be a positive number, got ${rate}`);
   }
-  const { ownerFloorRate, chartererCeilingRate } = n.limits;
-  const lastCall = isFinalRound(n);
-  const ownerAccepted = rateUsdPerTonne >= (lastCall ? ownerFloorRate : n.ownerOffer);
-  const chartererAccepted = rateUsdPerTonne <= (lastCall ? chartererCeilingRate : n.chartererBid);
-
-  // A side that says no counters, moving part of the way towards its limit.
-  const ownerOffer = ownerAccepted
-    ? n.ownerOffer
-    : Math.max(ownerFloorRate, roundUp(n.ownerOffer - (n.ownerOffer - ownerFloorRate) * CONCESSION));
-  const chartererBid = chartererAccepted
-    ? n.chartererBid
-    : Math.min(chartererCeilingRate, roundDown(n.chartererBid + (chartererCeilingRate - n.chartererBid) * CONCESSION));
-
-  const history = [
-    ...n.history,
-    { proposedRate: rateUsdPerTonne, ownerAccepted, chartererAccepted, ownerOffer, chartererBid },
-  ];
+  const s = n.limits;
+  const firm = kind === 'firm';
+  const ownerAccepted = rate >= (firm ? s.ownerFloorRate : n.ownerOffer);
+  const chartererAccepted = rate <= (firm ? s.chartererCeilingRate : n.chartererBid);
   const agreed = ownerAccepted && chartererAccepted;
-  const status: NegotiationStatus = agreed ? 'agreed' : history.length >= MAX_ROUNDS ? 'failed' : 'open';
-  return {
-    ...n,
-    status,
-    ownerOffer,
-    chartererBid,
-    agreedRate: agreed ? rateUsdPerTonne : null,
-    history,
-  };
+
+  // After a proposal, a side that says no counters part of the way to its limit.
+  // A firm offer gets no counters: it either closes or ends the talks.
+  const counter = !firm && !agreed;
+  const ownerOffer =
+    counter && !ownerAccepted
+      ? Math.max(s.ownerFloorRate, roundUp(n.ownerOffer - (n.ownerOffer - s.ownerFloorRate) * s.ownerConcession))
+      : n.ownerOffer;
+  const chartererBid =
+    counter && !chartererAccepted
+      ? Math.min(s.chartererCeilingRate, roundDown(n.chartererBid + (s.chartererCeilingRate - n.chartererBid) * s.chartererConcession))
+      : n.chartererBid;
+
+  const history = [...n.history, { kind, proposedRate: rate, ownerAccepted, chartererAccepted, ownerOffer, chartererBid }];
+  const status: NegotiationStatus = agreed
+    ? 'agreed'
+    : firm || history.length >= MAX_ROUNDS
+      ? 'failed'
+      : 'open';
+  return { ...n, status, ownerOffer, chartererBid, agreedRate: agreed ? rate : null, history };
 }
 
 export const roundsLeft = (n: Negotiation): number => MAX_ROUNDS - n.history.length;
 
-/** True when the next proposal is the last call. */
+/** True when the next message is the last call. */
 export const isFinalRound = (n: Negotiation): boolean => n.status === 'open' && roundsLeft(n) === 1;
+
+/** Proposals and firm offers left today, given every negotiation so far. */
+export function proposalsLeft(negotiations: readonly Negotiation[]): number {
+  return PROPOSALS_PER_DAY - negotiations.reduce((sum, n) => sum + n.history.length, 0);
+}

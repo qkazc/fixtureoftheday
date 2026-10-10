@@ -90,4 +90,6 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cell:disabled { cursor: default; opacity: 0.55; }
 .cell.fixed:disabled, .cell.failed:disabled, .cell.talking:disabled { opacity: 1; }
 .cell.nofit { border: none; color: var(--muted); opacity: 0.6; padding-left: 8px; }
+.budget { margin: 0 0 8px; }
+.budget.empty strong { color: var(--bad); }
 .totals { margin-top: 1rem; font-size: 1.1rem; }

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { generateMarket, MAX_ROUNDS, type Negotiation } from '../engine';
+import { generateMarket, MAX_ROUNDS, PROPOSALS_PER_DAY, type Negotiation } from '../engine';
 import {
   availableShips,
   boardCell,
+  budgetLeft,
   chooseShip,
   evaluate,
   initialSelections,
   isLocked,
+  sendFirmOffer,
   sendProposal,
   toFixtures,
   voyageOutline,
@@ -113,6 +115,39 @@ describe('boardCell', () => {
     for (let i = 0; i < MAX_ROUNDS; i++) f = sendProposal(f, 'C3', 0.05);
     expect(boardCell(market, f, 'S4', 'C3').status).toBe('failed');
     expect(boardCell(market, f, 'S2', 'C3').status).toBe('busy'); // cargo C3 is lost for the day
+  });
+});
+
+describe('firm offers and the daily budget', () => {
+  it('closes a deal with a firm offer inside both limits', () => {
+    const s = chooseShip(market, initialSelections(market), 'C4', 'S3');
+    const { ownerFloorRate, chartererCeilingRate } = s['C4']!.negotiation!.limits;
+    const done = sendFirmOffer(s, 'C4', (ownerFloorRate + chartererCeilingRate) / 2);
+    expect(done['C4']!.negotiation?.status).toBe('agreed');
+  });
+
+  it('spends one unit of budget per proposal or firm offer, across cargoes', () => {
+    let s = chooseShip(market, initialSelections(market), 'C4', 'S3');
+    s = chooseShip(market, s, 'C1', 'S2');
+    expect(budgetLeft(s)).toBe(PROPOSALS_PER_DAY);
+    s = sendProposal(s, 'C4', 0.05);
+    s = sendProposal(s, 'C1', 0.05);
+    expect(budgetLeft(s)).toBe(PROPOSALS_PER_DAY - 2);
+  });
+
+  it('ignores proposals once the budget is spent', () => {
+    // Burn the budget on lowball proposals across cargoes, freeing ships as talks fail.
+    let s = initialSelections(market);
+    const plays: [string, string][] = [['C4', 'S3'], ['C1', 'S2'], ['C3', 'S4']];
+    for (const [cargoId, shipId] of plays) {
+      s = chooseShip(market, s, cargoId, shipId);
+      for (let i = 0; i < MAX_ROUNDS && budgetLeft(s) > 0; i++) s = sendProposal(s, cargoId, 0.05);
+    }
+    s = chooseShip(market, s, 'C2', 'S5');
+    for (let i = 0; i < 5; i++) s = sendProposal(s, 'C2', 0.05);
+    expect(budgetLeft(s)).toBe(0);
+    expect(sendProposal(s, 'C2', 10)).toBe(s);
+    expect(sendFirmOffer(s, 'C2', 10)).toBe(s);
   });
 });
 

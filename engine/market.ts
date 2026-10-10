@@ -134,7 +134,7 @@ export interface NegotiationLimits {
 }
 
 /** A number in [min, max] fixed by the text, so each client keeps the same mood all day. */
-function seededShare(text: string, [min, max]: readonly [number, number]): number {
+export function seededShare(text: string, [min, max]: readonly [number, number]): number {
   return min + createRng(hashSeed(text))() * (max - min);
 }
 

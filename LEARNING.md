@@ -58,12 +58,15 @@ Places where the game deliberately differs from reality, and why.
 - **One message to both sides.** The broker sends the same proposed rate to
   the owner and the charterer each round. Real brokers relay separate
   messages, and tune what they tell each side.
-- **Fixed concessions.** A side that says no moves halfway from its current
-  position to its hidden limit. Real clients concede unevenly, bluff, and
-  react to how a proposal is pitched.
-- **Last call.** In round 3 each side takes any rate it can live with
-  rather than lose the deal. Real negotiations have no fixed last round;
-  deals die from time pressure or a better alternative turning up.
+- **Steady concessions.** Each client concedes the same share of the gap
+  every round (35–65%, varying by client). Real clients concede unevenly,
+  bluff, and react to how a proposal is pitched.
+- **Firm offers and a last call.** A firm offer closes if it's inside both
+  hidden limits and kills the deal otherwise; round 3 is always firm. Real
+  firm offers have time limits and can be countered rather than just declined.
+- **A budget of 8 messages a day.** Stands in for a broker's limited time.
+  Real limits are time zones, deadlines, and competing brokers fixing the
+  cargo first.
 - **Moods last a day.** Each owner's floor and charterer's ceiling come from
   the day's seed. Real clients remember how you treated them.
 
@@ -92,7 +95,9 @@ figures later.
   for this project.
 - **Negotiation** (`engine/market.ts`, `engine/negotiation.ts`): owner
   floors 80–95% of market TCE, charterer ceilings 105–120% of market rate,
-  openings 12% either side of market, 50% concession per counter, 3 rounds.
+  openings 10–35% away from each side's limit, concessions 35–65% of the gap
+  per counter, 3 rounds, 8 proposals per day. `engine/balance.test.ts`
+  checks that reading counters beats meeting in the middle.
 
 ## Notes
 

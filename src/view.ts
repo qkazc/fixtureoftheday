@@ -6,6 +6,7 @@ import {
   isFinalRound,
   MAX_ROUNDS,
   PORTS,
+  PROPOSALS_PER_DAY,
   type CargoOrder,
   type DailyMarket,
   type FixtureResult,
@@ -24,10 +25,12 @@ import {
 } from './format';
 import {
   boardCell,
+  budgetLeft,
   chooseShip,
   evaluate,
   initialSelections,
   isLocked,
+  sendFirmOffer,
   sendProposal,
   voyageOutline,
   type BoardCell,
@@ -50,6 +53,8 @@ const HINTS = {
   score: 'Score: brokerage × (owner + charterer satisfaction) ÷ 100.',
   offer: 'Offer: the rate the owner is currently asking. Owners offer; charterers bid.',
   bid: 'Bid: the rate the charterer is currently willing to pay.',
+  firm: 'Firm offer: take it or leave it. Closes the deal if both sides can live with the rate; if either can’t, the deal is dead.',
+  budget: 'A broker’s day is limited: every proposal or firm offer, on any cargo, uses one.',
 } as const;
 
 type Attrs = Record<string, string>;
@@ -87,6 +92,7 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
   const draftRates = new Map<string, string>();
 
   const board = el('div', { class: 'scroll' });
+  const budget = el('p', { class: 'budget' });
   const desk = el('div', { class: 'desk' });
   const totals = el('p', { class: 'totals' });
 
@@ -107,6 +113,7 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
     el('p', { class: 'hint' }, 'Pick a cell to open talks for that ship and cargo.'),
     board,
     el('h2', {}, 'Deal desk'),
+    budget,
     desk,
     totals,
   );
@@ -118,6 +125,13 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
 
   function render(): void {
     board.replaceChildren(marketBoard());
+    const left = budgetLeft(selections);
+    budget.className = left === 0 ? 'budget empty' : 'budget';
+    budget.replaceChildren(
+      term('Proposals left today', HINTS.budget),
+      ': ',
+      el('strong', {}, `${left} of ${PROPOSALS_PER_DAY}`),
+    );
     const e = evaluate(market, selections);
     desk.replaceChildren(
       ...market.cargoes.map((c) => dealCard(c, selections[c.id]!, e.byCargo[c.id] ?? null)),
@@ -232,7 +246,7 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
           'p',
           { class: isFinalRound(n) ? 'round last' : 'round' },
           isFinalRound(n)
-            ? 'Last call: each side will take any rate it can live with.'
+            ? 'Last call: your offer is firm. Each side takes it if they can live with it.'
             : `Round ${n.history.length + 1} of ${MAX_ROUNDS}`,
         ),
       );
@@ -245,20 +259,30 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
       });
       input.value = draftRates.get(c.id) ?? ((n.ownerOffer + n.chartererBid) / 2).toFixed(2);
       input.addEventListener('input', () => draftRates.set(c.id, input.value));
-      const send = el('button', { type: 'submit' }, 'Send proposal');
-      const form = el('form', { class: 'propose' }, input, send);
+      const outOfBudget = budgetLeft(selections) === 0;
+      const final = isFinalRound(n);
+      const proposeButton = el('button', { type: 'submit', value: 'propose' }, 'Send proposal');
+      const firmButton = el('button', { type: 'submit', value: 'firm', title: HINTS.firm }, final ? 'Firm offer (last call)' : 'Firm offer');
+      const form = el('form', { class: 'propose' }, input, ...(final ? [firmButton] : [proposeButton, firmButton]));
+      for (const b of [input, proposeButton, firmButton]) b.disabled = outOfBudget;
       form.addEventListener('submit', (ev) => {
         ev.preventDefault();
         const rate = input.valueAsNumber;
         if (!Number.isFinite(rate) || rate <= 0) return;
         draftRates.delete(c.id);
-        act(sendProposal(selections, c.id, rate));
+        const firm = (ev.submitter as HTMLButtonElement | null)?.value === 'firm';
+        act(firm ? sendFirmOffer(selections, c.id, rate) : sendProposal(selections, c.id, rate));
       });
       card.append(form);
+      if (outOfBudget) card.append(el('p', { class: 'hint' }, 'No proposals left today.'));
     } else if (n.status === 'agreed') {
       card.append(el('p', { class: 'outcome good' }, `Fixed at ${formatRate(n.agreedRate!)} in round ${n.history.length}`));
     } else {
-      card.append(el('p', { class: 'outcome bad' }, `No deal: talks ended after ${MAX_ROUNDS} rounds.`));
+      const last = n.history.at(-1)!;
+      const refusedBy = [!last.ownerAccepted && 'the owner', !last.chartererAccepted && 'the charterer']
+        .filter(Boolean)
+        .join(' and ');
+      card.append(el('p', { class: 'outcome bad' }, `No deal: ${refusedBy} turned down your firm offer.`));
     }
 
     if (n.history.length > 0) card.append(historyList(n.history));
@@ -270,8 +294,8 @@ export function renderGame(root: HTMLElement, market: DailyMarket): void {
 }
 
 function historyList(history: readonly NegotiationRound[]): HTMLElement {
-  const reply = (accepted: boolean, side: string, position: number) =>
-    accepted ? `${side} accepts` : `${side} counters ${formatRate(position)}`;
+  const reply = (r: NegotiationRound, accepted: boolean, side: string, position: number) =>
+    accepted ? `${side} accepts` : r.kind === 'firm' ? `${side} declines` : `${side} counters ${formatRate(position)}`;
   return el(
     'ol',
     { class: 'history' },
@@ -279,10 +303,10 @@ function historyList(history: readonly NegotiationRound[]): HTMLElement {
       el(
         'li',
         {},
-        `You proposed ${formatRate(r.proposedRate)}: `,
-        reply(r.ownerAccepted, 'owner', r.ownerOffer),
+        r.kind === 'firm' ? `Firm offer ${formatRate(r.proposedRate)}: ` : `You proposed ${formatRate(r.proposedRate)}: `,
+        reply(r, r.ownerAccepted, 'owner', r.ownerOffer),
         ', ',
-        reply(r.chartererAccepted, 'charterer', r.chartererBid),
+        reply(r, r.chartererAccepted, 'charterer', r.chartererBid),
       ),
     ),
   );

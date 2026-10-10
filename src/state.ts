@@ -4,7 +4,9 @@
 import {
   distanceNm,
   estimateVoyage,
+  firmOffer,
   propose,
+  proposalsLeft,
   scoreDay,
   startNegotiation,
   VESSEL_CLASSES,
@@ -72,11 +74,26 @@ export function chooseShip(
   };
 }
 
-/** Sends a proposal for one cargo. Ignored if there are no open talks. */
+/** Proposals and firm offers left today. */
+export function budgetLeft(selections: Selections): number {
+  return proposalsLeft(Object.values(selections).flatMap((s) => (s.negotiation ? [s.negotiation] : [])));
+}
+
+/** Sends a proposal for one cargo. Ignored without open talks or budget. */
 export function sendProposal(selections: Selections, cargoId: string, rate: number): Selections {
+  return send(selections, cargoId, (n) => propose(n, rate));
+}
+
+/** Makes a firm offer for one cargo. Ignored without open talks or budget. */
+export function sendFirmOffer(selections: Selections, cargoId: string, rate: number): Selections {
+  return send(selections, cargoId, (n) => firmOffer(n, rate));
+}
+
+function send(selections: Selections, cargoId: string, play: (n: Negotiation) => Negotiation): Selections {
   const current = selections[cargoId];
   if (!current?.negotiation || current.negotiation.status !== 'open') return selections;
-  return { ...selections, [cargoId]: { ...current, negotiation: propose(current.negotiation, rate) } };
+  if (budgetLeft(selections) <= 0) return selections;
+  return { ...selections, [cargoId]: { ...current, negotiation: play(current.negotiation) } };
 }
 
 /** Distance and voyage length for a ship-cargo pair; these don't depend on the rate. */

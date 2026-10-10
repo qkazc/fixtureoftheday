@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { generateMarket, hasDealZone, type DailyMarket } from './market';
 import {
+  firmOffer,
   isFinalRound,
   MAX_ROUNDS,
+  PROPOSALS_PER_DAY,
+  proposalsLeft,
   propose,
   roundsLeft,
   startNegotiation,
@@ -28,11 +31,10 @@ function allPairs(): { market: DailyMarket; shipId: string; cargoId: string }[] 
 const midpoint = (n: Negotiation) => Math.round(((n.ownerOffer + n.chartererBid) / 2) * 20) / 20;
 
 describe('startNegotiation', () => {
-  it('opens with the offer above the bid, each inside its side’s limit', () => {
+  it('opens with each side short of its limit', () => {
     for (const { market, shipId, cargoId } of allPairs()) {
       const n = startNegotiation(market, shipId, cargoId);
       expect(n.status).toBe('open');
-      expect(n.ownerOffer).toBeGreaterThan(n.chartererBid);
       expect(n.ownerOffer).toBeGreaterThanOrEqual(n.limits.ownerFloorRate);
       expect(n.chartererBid).toBeLessThanOrEqual(n.limits.chartererCeilingRate);
       expect(roundsLeft(n)).toBe(MAX_ROUNDS);
@@ -178,3 +180,62 @@ describe('propose', () => {
     expect(closed / winnable).toBeGreaterThan(0.5);
   });
 });
+
+describe('firmOffer', () => {
+  const m = generateMarket('2026-10-10');
+  const c = m.cargoes[0]!;
+  const open = () => startNegotiation(m, m.ships.find((s) => s.vesselClass === c.vesselClass)!.id, c.id);
+
+  it('closes at once when the rate is inside both hidden limits', () => {
+    let checked = 0;
+    for (const { market, shipId, cargoId } of allPairs()) {
+      const n = startNegotiation(market, shipId, cargoId);
+      const { ownerFloorRate, chartererCeilingRate } = n.limits;
+      if (ownerFloorRate > chartererCeilingRate) continue; // no deal zone for this pair
+      const done = firmOffer(n, (ownerFloorRate + chartererCeilingRate) / 2);
+      expect(done.status).toBe('agreed');
+      expect(done.history[0]!.kind).toBe('firm');
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('ends the talks when either side says no, with no counters', () => {
+    const n = open();
+    const tooLow = firmOffer(n, n.limits.ownerFloorRate * 0.9);
+    expect(tooLow.status).toBe('failed');
+    expect(tooLow.history[0]!.ownerAccepted).toBe(false);
+    expect(tooLow.ownerOffer).toBe(n.ownerOffer);
+    const tooHigh = firmOffer(n, n.limits.chartererCeilingRate * 1.1);
+    expect(tooHigh.status).toBe('failed');
+    expect(tooHigh.history[0]!.chartererAccepted).toBe(false);
+  });
+});
+
+describe('client behaviour varies', () => {
+  it('opens and concedes differently from client to client', () => {
+    const margins = new Set<number>();
+    const concessions = new Set<number>();
+    for (const { market, shipId, cargoId } of allPairs().slice(0, 30)) {
+      const n = startNegotiation(market, shipId, cargoId);
+      margins.add(Math.round((n.ownerOffer / n.limits.ownerFloorRate) * 100));
+      concessions.add(Math.round(n.limits.ownerConcession * 100));
+    }
+    expect(margins.size).toBeGreaterThan(5);
+    expect(concessions.size).toBeGreaterThan(5);
+  });
+});
+
+describe('proposalsLeft', () => {
+  it('counts every proposal and firm offer against the daily budget', () => {
+    const m = generateMarket('2026-10-10');
+    const c = m.cargoes[0]!;
+    let n = startNegotiation(m, m.ships.find((s) => s.vesselClass === c.vesselClass)!.id, c.id);
+    expect(proposalsLeft([n])).toBe(PROPOSALS_PER_DAY);
+    n = propose(n, 0.05);
+    n = propose(n, 0.05);
+    expect(proposalsLeft([n])).toBe(PROPOSALS_PER_DAY - 2);
+    expect(proposalsLeft([n, n])).toBe(PROPOSALS_PER_DAY - 4);
+  });
+});
+
