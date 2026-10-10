@@ -61,6 +61,10 @@ deeper, so a shallow port or channel can stop a ship from loading fully.
 **Dry bulk**: Unpackaged cargo loaded loose into a ship's holds, such as iron
 ore, coal, grain, bauxite or fertiliser.
 
+**Firm offer**: An offer the other side can accept straight away to close the
+deal, usually with a short deadline. If it's declined, talks often end. Unlike
+a counter, it says "this is my number".
+
 **Fixture**: A concluded charter deal: owner and charterer have agreed the
 ship, cargo, rate and terms. Brokers say a ship has been "fixed". It's where
 this game gets its name.
@@ -101,6 +105,10 @@ largest size that fit the old Panama Canal locks.
 dues, pilots, tugs, berth fees, agency fees. On a voyage charter the shipowner
 usually pays these.
 
+**Position list**: A broker's list of ships with where and when each becomes
+free (its open position). Brokers read it against their cargoes to spot which
+ships fit which jobs.
+
 **Sea margin**: An allowance (often around 5%) added to calculated sea time to
 cover bad weather and currents.
 
@@ -129,3 +137,7 @@ freight.
 **Voyage costs**: Costs that exist only because of a particular voyage: mainly
 bunkers, port costs and commissions. Different from opex, which the owner pays
 regardless.
+
+**Voyage estimate**: A quick calculation of a voyage's days, costs and TCE for
+a given ship, cargo and rate. Brokers and owners run these constantly to judge
+whether a deal makes sense.
