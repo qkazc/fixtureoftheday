@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { generateInbox, summarizeDay, endDay, startDay, attemptFix, isWorkable, negotiationLimits, type EnquiryEmail } from '../engine';
+import { generateInbox, summarizeDay, endDay, startDay, attemptFix, isWorkable, negotiationLimits, research, type EnquiryEmail } from '../engine';
 import {
   blockMessage,
   clockLabel,
   deadlineLabel,
+  endOfDayText,
   fixOutcomeMessage,
   fixtureReasonText,
   hoursLabel,
@@ -62,3 +63,39 @@ describe('end-of-day text', () => {
     expect(line.length).toBeGreaterThan(20);
   });
 });
+
+describe('endOfDayText', () => {
+  const inbox = generateInbox('2026-10-10');
+  const cargoOf = (id: string) => inbox.market.cargoes.find((c) => c.id === id)!;
+
+  it('says when the player ended the day', () => {
+    expect(endOfDayText(summarizeDay(inbox, endDay(startDay())), cargoOf)).toEqual([
+      'You ended the day at 09:00 with 8 h left.',
+    ]);
+  });
+
+  it('explains an early end: the time, and why each enquiry was out of reach', () => {
+    // 10 Oct: fix the Santos-Qingdao grain, then research Santos-Rotterdam at 13:00.
+    // Research takes it to 13:30, too late for a 2 h fix due by 15:00, and the day ends.
+    const enquiry = (to: string) =>
+      inbox.emails.find((e): e is EnquiryEmail => e.kind === 'enquiry' && cargoOf(e.cargoId).loadPort === 'santos' && cargoOf(e.cargoId).dischargePort === to)!;
+    const qingdao = enquiry('qingdao');
+    const rotterdam = enquiry('rotterdam');
+    const coal = inbox.emails.find((e): e is EnquiryEmail => e.kind === 'enquiry' && cargoOf(e.cargoId).commodity === 'coal')!;
+    let s = startDay();
+    // Use up the morning on the coal enquiry with a lowball (refused, costs 1 h), twice.
+    const coalShip = inbox.market.ships.find((sh) => isWorkable(inbox.market, sh, cargoOf(coal.cargoId)))!;
+    s = (attemptFix(inbox, s, coal.id, coalShip.id, 0.5) as { state: typeof s }).state;
+    s = (attemptFix(inbox, s, coal.id, coalShip.id, 0.5) as { state: typeof s }).state;
+    const qShip = inbox.market.ships.find((sh) => isWorkable(inbox.market, sh, cargoOf(qingdao.cargoId)))!;
+    const l = negotiationLimits(inbox.market, qShip, cargoOf(qingdao.cargoId));
+    s = (attemptFix(inbox, s, qingdao.id, qShip.id, (l.ownerFloorRate + l.chartererCeilingRate) / 2) as { state: typeof s }).state;
+    s = { ...s, clockHour: 13 };
+    const r = research(inbox, s, rotterdam.id);
+    expect(r.ok && r.state.ended).toBe(true);
+    const lines = endOfDayText(summarizeDay(inbox, r.state), cargoOf);
+    expect(lines[0]).toBe('Day ended at 13:30 with 3.5 h left: nothing more you could act on.');
+    expect(lines).toContain('69,000 t grain, Santos to Rotterdam: needed 2 h, but its deadline was 15:00.');
+  });
+});
+

@@ -59,6 +59,8 @@ export interface DayState {
   distractionHandled: boolean;
   log: LogEntry[];
   ended: boolean;
+  /** Who ended the day: the player, or the game because nothing was left to do. */
+  endedBy: 'player' | 'nothingLeft' | null;
 }
 
 export type BlockReason =
@@ -77,7 +79,15 @@ export type ActionResult<T> =
   | { ok: false; state: DayState; reason: BlockReason };
 
 export function startDay(): DayState {
-  return { clockHour: DAY_START_HOUR, researched: [], fixtures: [], distractionHandled: false, log: [], ended: false };
+  return {
+    clockHour: DAY_START_HOUR,
+    researched: [],
+    fixtures: [],
+    distractionHandled: false,
+    log: [],
+    ended: false,
+    endedBy: null,
+  };
 }
 
 export const hoursLeft = (state: DayState): number => DAY_END_HOUR - state.clockHour;
@@ -116,7 +126,7 @@ function spend(inbox: Inbox, state: DayState, hours: number, entry: Omit<LogEntr
     clockHour: state.clockHour + hours,
     log: [...state.log, { ...entry, atHour: state.clockHour }],
   };
-  return anyActionPossible(inbox, next) ? next : { ...next, ended: true };
+  return anyActionPossible(inbox, next) ? next : { ...next, ended: true, endedBy: 'nothingLeft' };
 }
 
 export interface ResearchRow {
@@ -222,7 +232,19 @@ export function handleDistraction(inbox: Inbox, state: DayState, emailId: string
 }
 
 /** The player chooses to stop for the day. */
-export const endDay = (state: DayState): DayState => ({ ...state, ended: true });
+export const endDay = (state: DayState): DayState =>
+  state.ended ? state : { ...state, ended: true, endedBy: 'player' };
+
+/** Why an unfixed enquiry can no longer be acted on, or null if it still can. */
+export type EnquiryBlocker = 'deadline' | 'endOfDay' | 'noShip';
+
+export function enquiryBlocker(inbox: Inbox, state: DayState, email: EnquiryEmail): EnquiryBlocker | null {
+  if (state.clockHour + email.effortHours > DAY_END_HOUR) return 'endOfDay';
+  if (state.clockHour + email.effortHours > lastHour(email)) return 'deadline';
+  const cargo = cargoOf(inbox, email);
+  if (!availableShips(inbox, state).some((s) => fitCheck(s, cargo).fits)) return 'noShip';
+  return null;
+}
 
 /** True if at least one action could still be taken in the time left. */
 export function anyActionPossible(inbox: Inbox, state: DayState): boolean {
@@ -259,11 +281,15 @@ export interface FixtureSummary {
 
 export interface SkippedEnquiry {
   email: EnquiryEmail;
+  /** Why it could no longer be acted on when the day ended (null if it still could). */
+  blocker: EnquiryBlocker | null;
   /** A ship that could have fixed it, with a rough commission, or null if none could. */
   couldHaveFixed: { ship: ShipOffer; ballastNm: number; approxCommissionUsd: number } | null;
 }
 
 export interface DaySummary {
+  endedAtHour: number;
+  endedBy: DayState['endedBy'];
   fixtures: FixtureSummary[];
   /** Brokerage on fixtures plus the distraction's payout. */
   totalCommissionUsd: number;
@@ -293,9 +319,15 @@ export function summarizeDay(inbox: Inbox, state: DayState): DaySummary {
   const used = usedShipIds(state);
   const skippedEnquiries = inbox.emails
     .filter((e): e is EnquiryEmail => e.kind === 'enquiry' && enquiryStatus(state, e) !== 'fixed')
-    .map((email) => ({ email, couldHaveFixed: bestShipFor(inbox, email, used) }));
+    .map((email) => ({
+      email,
+      blocker: enquiryBlocker(inbox, state, email),
+      couldHaveFixed: bestShipFor(inbox, email, used),
+    }));
 
   return {
+    endedAtHour: state.clockHour,
+    endedBy: state.endedBy,
     fixtures,
     totalCommissionUsd: day.totalBrokerageUsd + distractionUsd,
     totalScore: day.totalScore + distractionUsd,

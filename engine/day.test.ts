@@ -3,6 +3,7 @@ import {
   anyActionPossible,
   attemptFix,
   endDay,
+  enquiryBlocker,
   enquiryStatus,
   handleDistraction,
   hoursLeft,
@@ -133,6 +134,7 @@ describe('deadlines', () => {
     expect(enquiryStatus(before, e)).toBe('open');
     const after: DayState = { ...before, clockHour: before.clockHour + 0.5 };
     expect(enquiryStatus(after, e)).toBe('lost');
+    expect(enquiryBlocker(inbox, after, e)).toBe('deadline');
     const ship = inbox.market.ships.find((s) => isWorkable(inbox.market, s, cargoOf(inbox, e)))!;
     const r = attemptFix(inbox, after, e.id, ship.id, goodRate(inbox, ship, cargoOf(inbox, e)));
     expect(!r.ok && r.reason).toBe('deadlinePassed');
@@ -204,7 +206,23 @@ describe('a sensible day', () => {
       s = r.state;
     }
     expect(s.ended).toBe(true);
+    expect(s.endedBy).toBe('nothingLeft');
     expect(anyActionPossible(inbox, s)).toBe(false);
+    // Every enquiry left unfixed says why it could no longer be done.
+    for (const skipped of summarizeDay(inbox, s).skippedEnquiries) {
+      expect(skipped.blocker).not.toBeNull();
+    }
+  });
+
+  it('records when the player ends the day themselves', () => {
+    const inbox = generateInbox('2026-10-10');
+    const s = endDay(startDay());
+    expect(s.endedBy).toBe('player');
+    const summary = summarizeDay(inbox, s);
+    expect(summary.endedBy).toBe('player');
+    expect(summary.endedAtHour).toBe(DAY_START_HOUR);
+    // At 09:00 every enquiry could still have been worked.
+    expect(summary.skippedEnquiries.every((x) => x.blocker === null)).toBe(true);
   });
 });
 

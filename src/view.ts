@@ -28,6 +28,7 @@ import {
   cargoLabel,
   clockLabel,
   deadlineLabel,
+  endOfDayText,
   fixOutcomeMessage,
   fixtureReasonText,
   hoursLabel,
@@ -329,6 +330,7 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
       'section',
       { 'aria-label': 'End of day' },
       el('h2', {}, 'End of day'),
+      ...endOfDayText(s, cargoOf).map((line) => el('p', {}, line)),
       el(
         'ul',
         {},

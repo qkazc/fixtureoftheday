@@ -3,6 +3,7 @@
 
 import {
   DAY_END_HOUR,
+  type DaySummary,
   PORTS,
   type BlockReason,
   type CargoOrder,
@@ -89,3 +90,28 @@ export function skippedText(s: SkippedEnquiry, vesselClass: (shipClass: VesselCl
   if (!could) return `${worth}. No ship today could have fixed it.`;
   return `${worth}. ${could.ship.name}, a ${vesselClass(could.ship.vesselClass)} ${formatNm(could.ballastNm)} away, could have fixed it for about ${formatUsd(could.approxCommissionUsd)} commission.`;
 }
+
+/**
+ * Why and when the day ended: one opening line, then one line per enquiry
+ * that could no longer be done (only when the game ended the day itself).
+ */
+export function endOfDayText(summary: DaySummary, cargoOf: (cargoId: string) => CargoOrder): string[] {
+  const at = clockLabel(summary.endedAtHour);
+  const left = hoursLabel(DAY_END_HOUR - summary.endedAtHour);
+  if (summary.endedBy === 'player') return [`You ended the day at ${at} with ${left} left.`];
+  if (summary.endedAtHour >= DAY_END_HOUR) return [`Day ended at ${at}: out of time.`];
+  const lines = [`Day ended at ${at} with ${left} left: nothing more you could act on.`];
+  for (const s of summary.skippedEnquiries) {
+    const what = cargoLabel(cargoOf(s.email.cargoId));
+    const needed = hoursLabel(s.email.effortHours);
+    if (s.blocker === 'deadline') {
+      lines.push(`${what}: needed ${needed}, but its deadline was ${clockLabel(s.email.deadlineHour!)}.`);
+    } else if (s.blocker === 'endOfDay') {
+      lines.push(`${what}: needed ${needed}, more than the time left.`);
+    } else if (s.blocker === 'noShip') {
+      lines.push(`${what}: no free ship of the right size could make the laycan.`);
+    }
+  }
+  return lines;
+}
+
