@@ -22,6 +22,10 @@ owner is a beginner in shipping, so teaching is part of every change.
 - **Flag simplifications.** Say clearly where the model simplifies reality.
   Record them in code comments next to the logic, and note the bigger ones in
   `LEARNING.md`.
+- **Simple over precise.** This is a hypothetical game. Prefer simple,
+  plausible, clearly-labelled numbers over precision (e.g. a hand-written
+  distance table, not a routing model). Keep modules small.
+- **Ask before adding any dependency or dataset**, including dev-only ones.
 - **Label placeholder numbers.** If a number is a made-up or rough value
   rather than a sourced real-world figure, say so, and mark it in code with a
   `// PLACEHOLDER:` comment. Real figures should note their source or basis.

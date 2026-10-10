@@ -24,6 +24,13 @@ Places where the game deliberately differs from reality, and why.
   the ship can sit in the water (draft), so it can't be loaded full.
 - **No canals.** Suez/Panama tolls and waiting times are ignored.
 
+### Ports and distances (`engine/ports.ts`)
+- **Ten ports, one distance per pair.** Real voyages have route choices
+  (Suez or the Cape, Panama or not), and canals limit ship size: a loaded
+  Capesize can't fit through Panama. We use one fixed distance per pair.
+- **Areas as ports.** "US Gulf" stands for many Mississippi River grain
+  terminals, and Kamsar for the wider Guinea bauxite coast.
+
 ## Placeholder numbers
 
 Values we made up or estimated roughly, to replace with better-sourced
@@ -35,6 +42,10 @@ figures later.
 - **Test voyage**: 55,000 t at $20/t, 5% commission, 500 nm ballast +
   6,000 nm laden, 8 port days, $150,000 port costs, bunkers $600/t.
   Plausible, not sourced.
+
+- **Port distances** (`engine/ports.ts`): game estimates, approximate,
+  rounded to the nearest 50 nm. Plausible for the usual routes but not from
+  official distance tables.
 
 ## Notes
 
