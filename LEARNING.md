@@ -87,6 +87,17 @@ Places where the game deliberately differs from reality, and why.
   only because bunker prices change. Real indices move with supply and
   demand: ships, cargoes, weather, congestion and sentiment.
 
+### Daily puzzles (`engine/solver.ts`, `engine/daily.ts`)
+- **The best day assumes perfect information.** The solver knows every
+  hidden limit, so it never researches and never has a fix refused. It is a
+  ceiling to measure against, not what a careful player should expect.
+- **"Interesting" means one thing.** A day is kept if a naive plan (soonest
+  deadline first, best free ship each time, ignore the distraction) misses
+  at least 5% of the best score. That captures the contest and the
+  deadline squeeze, but not, for example, how hard the pricing is.
+- **Re-rolled days.** About three in four first draws are re-rolled.
+  Real markets aren't curated, of course: some real days are dull.
+
 ### The desk map (`src/mapData.ts`, `src/mapGeometry.ts`)
 - **Hand-drawn, low-poly world.** Continents are a few dozen points each,
   and ports are placed by rough coordinates.
@@ -131,6 +142,9 @@ figures later.
 - **Morning brief** (`engine/briefing.ts`): 3-4 news lines (always the
   contest, plus 2-3 of the others); indicative rates use a mid-size cargo
   and the 2,000 nm typical ballast leg.
+- **Puzzle picker** (`engine/daily.ts`): a day must leave at least 5% on
+  the table for the naive plan, and the best plan may miss at most one
+  enquiry; up to 16 draws per date. Tuned by measuring a year of dates.
 - **Map geography** (`src/mapData.ts`): hand-drawn continent outlines and
   approximate port coordinates.
 
