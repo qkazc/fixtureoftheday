@@ -17,12 +17,12 @@ import {
   PORTS,
   type BlockReason,
   type DayState,
-  type Email,
   type EnquiryEmail,
   type Inbox,
 } from '../engine';
-import { formatClass, formatCommodity, formatNm, formatUsd, formatUsdPerDay } from './format';
-import { boardCell } from './board';
+import { compactUsd, formatClass, formatCommodity, formatNm, formatUsd } from './format';
+import { matchRows, type BoardCell } from './board';
+import { inboxRows } from './inboxRows';
 import { drawMap } from './mapView';
 import {
   blockMessage,
@@ -155,65 +155,62 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
     return el(
       'div',
       {},
-      el('p', { class: 'tabs' }, tab('positions', 'Positions × enquiries'), tab('index', 'Freight index')),
+      el('p', { class: 'tabs' }, tab('positions', 'Matches'), tab('index', 'Freight index')),
       boardTab === 'index' ? rateIndex() : positionsBoard(),
     );
   }
 
   function positionsBoard(): HTMLElement {
-    const enquiries = inbox.emails.filter((e): e is EnquiryEmail => e.kind === 'enquiry');
-    const head = el(
-      'tr',
-      {},
-      el('th', {}, 'Ship · open'),
-      ...enquiries.map((e) => {
-        const cargo = inbox.market.cargoes.find((c) => c.id === e.cargoId)!;
-        const status = enquiryStatus(day, e);
-        return el(
-          'th',
-          { class: openId === e.id ? 'col focus' : 'col' },
-          `${formatClass(cargo.vesselClass)} ${formatCommodity(cargo.commodity).toLowerCase()}`,
-          el('br'),
-          `${PORTS[cargo.loadPort].name} → ${PORTS[cargo.dischargePort].name}`,
-          el('br'),
-          status === 'open' ? (day.researched.includes(e.id) ? 'researched' : 'not researched') : status.toUpperCase(),
-        );
-      }),
-    );
-    const rows = inbox.market.ships.map((ship) =>
-      el(
-        'tr',
-        {},
-        el('th', { scope: 'row' }, ship.name, el('br'), el('span', { class: 'muted' }, `${formatClass(ship.vesselClass)} · ${PORTS[ship.openPort].name} ${calendarDay(inbox.date, ship.openDay)}`)),
-        ...enquiries.map((e) => el('td', {}, boardButton(ship.id, e))),
-      ),
-    );
+    const rows = matchRows(inbox, day);
     return el(
       'div',
       {},
-      el('table', { class: 'board' }, el('thead', {}, head), el('tbody', {}, ...rows)),
-      el('p', { class: 'legend muted' }, 'Ballast always shown. Owner TCE at the rate idea appears once you research an enquiry: green beats the market, amber is within 20%, red is worse. Pick a cell to work that pair.'),
+      el(
+        'ul',
+        { class: 'matches' },
+        ...rows.map((row) => {
+          const closed = row.status !== 'open';
+          return el(
+            'li',
+            { class: `match${openId === row.email.id ? ' focus' : ''}${closed ? ' closed' : ''}` },
+            el(
+              'div',
+              { class: 'match-head' },
+              el('span', { class: 'what' }, `${formatClass(row.cargo.vesselClass)} ${formatCommodity(row.cargo.commodity).toLowerCase()} · ${PORTS[row.cargo.loadPort].name} → ${PORTS[row.cargo.dischargePort].name}`),
+              el(
+                'span',
+                { class: 'when' },
+                closed
+                  ? el('span', { class: `chip chip-${row.status}` }, row.status.toUpperCase())
+                  : `due ${deadlineLabel(row.email.deadlineHour).replace('answer by ', '')}${row.researched ? '' : ' · not researched'}`,
+              ),
+            ),
+            el('div', { class: 'chips' }, ...row.candidates.map((c) => shipChip(row.email, c.ship.id, c.cell))),
+          );
+        }),
+      ),
+      el('p', { class: 'legend muted' }, 'Ships of the right size, nearest first. Research an enquiry to see each owner’s estimated daily earnings: green beats the market, amber is within 20%, red is worse. Pick a ship to work that deal.'),
     );
   }
 
-  function boardButton(shipId: string, e: EnquiryEmail): HTMLElement {
-    const cell = boardCell(inbox, day, shipId, e);
-    if (cell.fit === 'wrongSize') return el('span', { class: 'cell none', title: 'Wrong size for this cargo' }, '—');
+  function shipChip(e: EnquiryEmail, shipId: string, cell: BoardCell): HTMLElement {
+    const ship = inbox.market.ships.find((s) => s.id === shipId)!;
     const level = cell.estTceRatio === null ? '' : cell.estTceRatio >= 1 ? 'good' : cell.estTceRatio >= 0.8 ? 'ok' : 'bad';
-    const lines: (Node | string)[] = [formatNm(cell.ballastNm)];
-    if (cell.estTceUsdPerDay !== null) lines.push(el('br'), el('span', { class: `tce ${level}` }, formatUsdPerDay(cell.estTceUsdPerDay)));
-    if (cell.fit === 'missesLaycan') lines.push(el('br'), el('span', { class: 'late' }, 'too late'));
-    if (cell.state === 'fixedHere') lines.push(el('br'), el('span', { class: 'fixed' }, 'FIXED'));
+    const parts: (Node | string)[] = [el('span', { class: 'name' }, ship.name), el('span', { class: 'nm' }, formatNm(cell.ballastNm))];
+    if (cell.estTceUsdPerDay !== null) parts.push(el('span', { class: `tce ${level}` }, `${compactUsd(cell.estTceUsdPerDay)}/d`));
+    if (cell.fit === 'missesLaycan') parts.push(el('span', { class: 'late' }, 'too late'));
+    if (cell.state === 'fixedHere') parts.push(el('span', { class: 'fixed' }, 'FIXED'));
+    if (cell.state === 'shipTaken') parts.push(el('span', { class: 'muted' }, 'taken'));
     const b = button('', () => {
       openId = e.id;
       read.add(e.id);
       shipChoice.set(e.id, shipId);
       render();
     }, {
-      class: `cell ${cell.state}${openId === e.id && shipChoice.get(e.id) === shipId ? ' chosen' : ''}`,
-      'aria-label': `${inbox.market.ships.find((s) => s.id === shipId)!.name} for ${e.subject}`,
+      class: `ship-chip ${level} ${cell.state}${openId === e.id && shipChoice.get(e.id) === shipId ? ' chosen' : ''}`,
+      'aria-label': `${ship.name} for ${e.subject}`,
     });
-    b.replaceChildren(...lines);
+    b.replaceChildren(...parts);
     b.disabled = cell.state !== 'open';
     return b;
   }
@@ -251,37 +248,39 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
     );
   }
 
-  function statusOf(e: Email): string {
-    if (e.kind === 'enquiry') {
-      const s = enquiryStatus(day, e);
-      return s === 'fixed' ? 'FIXED' : s === 'lost' ? 'LOST' : '';
-    }
-    if (e.kind === 'distraction') return day.distractionHandled ? 'DONE' : day.clockHour + e.effortHours > (e.deadlineHour ?? 17) ? 'MISSED' : '';
-    return '';
-  }
-
   function inboxList(): HTMLElement {
-    return el(
-      'ul',
-      { class: 'inbox' },
-        ...inbox.emails.map((e) => {
-          const meta = [
-            deadlineLabel(e.deadlineHour),
-            e.effortHours > 0 ? hoursLabel(e.effortHours) : 'read only',
-            e.approxCommissionUsd > 0 ? roughUsd(e.approxCommissionUsd) : '',
-            statusOf(e),
-          ].filter(Boolean);
-          const label = `${read.has(e.id) ? '' : '• '}${e.from}: ${e.subject} [${meta.join(' · ')}]`;
-          return el(
-            'li',
-            {},
-            button(label, () => ((openId = e.id), read.add(e.id), render()), {
-              'aria-current': String(openId === e.id),
-              class: read.has(e.id) ? 'mail' : 'mail unread',
+    const rows = inboxRows(inbox, day);
+    const group = (title: string, which: 'action' | 'reference') =>
+      el(
+        'div',
+        { class: 'mail-group' },
+        el('h3', {}, title),
+        el(
+          'ul',
+          { class: 'inbox' },
+          ...rows
+            .filter((r) => r.group === which)
+            .map((r) => {
+              const b = button('', () => ((openId = r.id), read.add(r.id), render()), {
+                'aria-current': String(openId === r.id),
+                class: `mail${read.has(r.id) ? '' : ' unread'}${r.status ? ' done' : ''}`,
+              });
+              b.replaceChildren(
+                el('span', { class: `tag tag-${r.tag.toLowerCase()}` }, r.tag),
+                el('span', { class: 'from' }, r.from),
+                el('span', { class: `due${r.dueSoon ? ' soon' : ''}` }, r.due),
+                el('span', { class: 'summary' }, r.summary),
+                el(
+                  'span',
+                  { class: 'stakes' },
+                  r.status ? el('span', { class: `chip chip-${r.status.toLowerCase()}` }, r.status) : r.stakes,
+                ),
+              );
+              return el('li', {}, b);
             }),
-          );
-        }),
-    );
+        ),
+      );
+    return el('div', {}, group('Needs action', 'action'), group('For reference', 'reference'));
   }
 
   function emailView(id: string): HTMLElement {

@@ -39,3 +39,10 @@ export function isoDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
+/** Short money for tight spaces: 18,844 → "$18.8k", 950 → "$950". */
+export function compactUsd(usd: number): string {
+  const sign = usd < 0 ? '−' : '';
+  const a = Math.abs(usd);
+  return a >= 1000 ? `${sign}$${(a / 1000).toFixed(1)}k` : `${sign}$${Math.round(a)}`;
+}

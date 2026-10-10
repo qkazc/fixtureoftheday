@@ -9,7 +9,7 @@ import {
   startDay,
   type EnquiryEmail,
 } from '../engine';
-import { boardCell } from './board';
+import { boardCell, matchRows } from './board';
 
 const inbox = generateInbox('2026-10-10');
 const enquiries = inbox.emails.filter((e): e is EnquiryEmail => e.kind === 'enquiry');
@@ -53,3 +53,29 @@ describe('boardCell', () => {
     expect(boardCell(inbox, startDay(), otherShip.id, other).state).toBe('open');
   });
 });
+
+describe('matchRows', () => {
+  const rows = matchRows(inbox, startDay());
+
+  it('has one row per enquiry, soonest deadline first', () => {
+    expect(rows).toHaveLength(enquiries.length);
+    const deadlines = rows.map((r) => r.email.deadlineHour!);
+    expect(deadlines).toEqual([...deadlines].sort((a, b) => a - b));
+  });
+
+  it('lists only ships of the right size, nearest first', () => {
+    for (const row of rows) {
+      expect(row.candidates.length).toBeGreaterThan(0);
+      for (const c of row.candidates) expect(c.ship.vesselClass).toBe(row.cargo.vesselClass);
+      const nm = row.candidates.map((c) => c.cell.ballastNm);
+      expect(nm).toEqual([...nm].sort((a, b) => a - b));
+    }
+  });
+
+  it('shows the contested ship under two enquiries', () => {
+    const counts = new Map<string, number>();
+    for (const row of rows) for (const c of row.candidates) if (c.cell.fit === 'fits') counts.set(c.ship.id, (counts.get(c.ship.id) ?? 0) + 1);
+    expect([...counts.values()].some((n) => n >= 2)).toBe(true);
+  });
+});
+
