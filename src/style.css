@@ -1,55 +1,128 @@
+/* A broker's desk in a dark terminal style: panes with title bars, monospace
+   type, amber accent, green/red for moves. A single deliberate dark look. */
 :root {
-  --bg: #fbfaf7;
-  --fg: #1d2329;
-  --muted: #5d6873;
-  --line: #d9dde1;
-  --head: #eef1f3;
-  --good: #1f7a4d;
-  --ok: #9a6700;
-  --bad: #b42318;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #14181c;
-    --fg: #e6e9ec;
-    --muted: #9aa5af;
-    --line: #2f363d;
-    --head: #1d2329;
-    --good: #4cc38a;
-    --ok: #e2b340;
-    --bad: #f97066;
-    color-scheme: dark;
-  }
-}
-:root[data-theme='dark'] {
-  --bg: #14181c;
-  --fg: #e6e9ec;
-  --muted: #9aa5af;
-  --line: #2f363d;
-  --head: #1d2329;
-  --good: #4cc38a;
-  --ok: #e2b340;
-  --bad: #f97066;
+  --bg: #090d0b;
+  --pane: #0f1512;
+  --pane-head: #141d18;
+  --line: #24332b;
+  --fg: #d3dfd7;
+  --muted: #7d9086;
+  --accent: #f2b63c;
+  --good: #46d27f;
+  --bad: #ff6f61;
+  --ok: #e8b04a;
+  --sea: #0b161c;
+  --land: #1b2822;
+  --coast: #36503f;
+  --route: #f2b63c;
+  --ballast: #6fb7d6;
+  --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   color-scheme: dark;
 }
+
 body {
-  margin: 0 auto;
-  max-width: 1100px;
-  padding-block: 16px;
+  margin: 0;
+  padding-block: 12px;
   padding-inline: 16px;
   background: var(--bg);
   color: var(--fg);
-  font: 15px/1.45 system-ui, sans-serif;
+  font: 13px/1.45 var(--mono);
 }
-h1 { margin: 0; font-size: 1.6rem; }
-h2 { margin: 1.4rem 0 0.4rem; font-size: 1.1rem; }
-h3 { margin: 1rem 0 0.3rem; font-size: 1rem; }
-ul { padding-left: 1.2em; }
-li { margin: 4px 0; }
-li > button { text-align: left; }
-button, select, input { font: inherit; }
-button[aria-current='true'] { font-weight: 600; }
-pre { white-space: pre-wrap; font: inherit; }
-table { border-collapse: collapse; display: block; overflow-x: auto; }
-th, td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+
+h2 { margin: 0 0 6px; font-size: 14px; color: var(--fg); text-wrap: balance; }
+h3 { margin: 12px 0 4px; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+p { margin: 6px 0; }
+ul { margin: 6px 0; padding-left: 1.2em; }
+li { margin: 3px 0; }
+.muted { color: var(--muted); }
+pre { white-space: pre-wrap; font: inherit; margin: 8px 0; padding: 8px; background: var(--bg); border: 1px solid var(--line); }
+
+button, select, input { font: inherit; color: var(--fg); }
+button {
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); color: var(--accent); }
+button.primary { border-color: var(--accent); color: var(--bg); background: var(--accent); font-weight: 700; }
+button.primary:hover { color: var(--bg); filter: brightness(1.1); }
+select { background: var(--bg); border: 1px solid var(--line); padding: 2px 4px; max-width: 100%; }
+input[type='range'] { accent-color: var(--accent); vertical-align: middle; max-width: 60%; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Top bar */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  background: var(--pane-head);
+}
+.brand { color: var(--accent); font-weight: 700; letter-spacing: 0.12em; }
+.clock { color: var(--muted); font-variant-numeric: tabular-nums; }
+.topbar button { margin-left: auto; }
+
+/* The desk: a grid of panes per screen */
+.desk { display: grid; gap: 12px; }
+.desk-brief {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  grid-template-areas: 'news map' 'board board';
+}
+.desk-day {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  grid-template-areas: 'map inbox' 'board email';
+}
+.desk-summary { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'summary'; }
+.area-news { grid-area: news; }
+.area-map { grid-area: map; }
+.area-board { grid-area: board; }
+.area-inbox { grid-area: inbox; }
+.area-email { grid-area: email; }
+.area-summary { grid-area: summary; }
+
+.pane { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); background: var(--pane); }
+.pane-title {
+  padding: 4px 10px;
+  background: var(--pane-head);
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.pane-body { padding: 8px 10px; min-width: 0; overflow-x: auto; }
+.area-inbox .pane-body, .area-email .pane-body { max-height: 70vh; overflow-y: auto; }
+
+@media (max-width: 900px) {
+  .desk-brief, .desk-day { grid-template-columns: minmax(0, 1fr); }
+  .desk-brief { grid-template-areas: 'news' 'map' 'board'; }
+  .desk-day { grid-template-areas: 'inbox' 'email' 'map' 'board'; }
+  .area-inbox .pane-body, .area-email .pane-body { max-height: none; }
+}
+
+/* News */
+.news { list-style: none; padding: 0; }
+.news li { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.news li::before { content: '▸ '; color: var(--accent); }
+
+/* Inbox */
+.inbox { list-style: none; padding: 0; margin: 0; }
+.inbox li { margin: 0; }
+button.mail { display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line); padding: 6px 4px; color: var(--muted); }
+button.mail.unread { color: var(--fg); font-weight: 700; }
+button.mail[aria-current='true'] { background: var(--pane-head); color: var(--accent); }
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 3px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-weight: 400; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+td.num { text-align: right; }
+.up { color: var(--good); }
+.down { color: var(--bad); }
+
+[role='status'] { color: var(--accent); }

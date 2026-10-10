@@ -55,6 +55,16 @@ function button(label: string, onClick: () => void, attrs: Attrs = {}): HTMLButt
   return b;
 }
 
+/** A titled pane on the broker's desk. `area` places it in the screen's grid. */
+function pane(title: string, area: string, ...content: (Node | string)[]): HTMLElement {
+  return el(
+    'section',
+    { class: `pane area-${area}`, 'aria-label': title },
+    el('header', { class: 'pane-title' }, title),
+    el('div', { class: 'pane-body' }, ...content),
+  );
+}
+
 export function renderGame(root: HTMLElement, inbox: Inbox): void {
   let day: DayState = startDay();
   /** The morning brief comes first; the inbox opens when the day starts. */
@@ -77,37 +87,68 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
   }
 
   function render(): void {
-    if (!started) {
-      root.replaceChildren(el('h1', {}, 'Fixture of the Day'), briefView());
-      return;
-    }
-    root.replaceChildren(
-      el('h1', {}, 'Fixture of the Day'),
-      el(
-        'p',
-        {},
-        `${calendarDay(inbox.date, 0)} ${inbox.date.slice(0, 4)} · ${clockLabel(day.clockHour)} · ${hoursLabel(hoursLeft(day))} left `,
-        day.ended ? '' : button('End day', () => ((day = endDay(day)), render())),
-      ),
-      ...(day.ended ? [summaryView()] : [inboxList(), openId ? emailView(openId) : el('p', {}, 'Open an email to read it.')]),
+    const screen = !started ? 'brief' : day.ended ? 'summary' : 'day';
+    const panes =
+      screen === 'brief'
+        ? [
+            pane('Overnight news', 'news', newsList()),
+            pane('Map', 'map', mapView()),
+            pane('Market board · freight index', 'board', rateIndex()),
+          ]
+        : screen === 'summary'
+          ? [pane('End of day', 'summary', summaryView())]
+          : [
+              pane('Map', 'map', mapView()),
+              pane('Inbox', 'inbox', inboxList()),
+              pane('Market board', 'board', rateIndex()),
+              pane('Email', 'email', openId ? emailView(openId) : el('p', { class: 'muted' }, 'Open an email to read it.')),
+            ];
+    root.replaceChildren(topBar(screen), el('main', { class: `desk desk-${screen}` }, ...panes));
+  }
+
+  function topBar(screen: 'brief' | 'day' | 'summary'): HTMLElement {
+    const date = `${calendarDay(inbox.date, 0)} ${inbox.date.slice(0, 4)}`;
+    const status =
+      screen === 'brief'
+        ? 'Morning brief · before 09:00'
+        : screen === 'day'
+          ? `${clockLabel(day.clockHour)} · ${hoursLabel(hoursLeft(day))} left`
+          : `Day over · ${clockLabel(day.clockHour)}`;
+    const action =
+      screen === 'brief'
+        ? button('Start the day (09:00)', () => ((started = true), render()), { class: 'primary' })
+        : screen === 'day'
+          ? button('End day', () => ((day = endDay(day)), render()))
+          : '';
+    return el(
+      'header',
+      { class: 'topbar' },
+      el('span', { class: 'brand' }, 'FIXTURE OF THE DAY'),
+      el('span', {}, date),
+      el('span', { class: 'clock' }, status),
+      action,
     );
   }
 
-  function briefView(): HTMLElement {
+  /** Placeholder until the map lands in the next step. */
+  function mapView(): HTMLElement {
+    return el('p', { class: 'muted' }, 'Map: ports and ships.');
+  }
+
+  function newsList(): HTMLElement {
+    return el('ul', { class: 'news' }, ...generateBriefing(inbox).news.map((n) => el('li', {}, n.text)));
+  }
+
+  function rateIndex(): HTMLElement {
     const b = generateBriefing(inbox);
-    const signed = (n: number) => (n === 0 ? 'unchanged' : `${n > 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`);
+    const signed = (n: number) => (n === 0 ? '0.00' : `${n > 0 ? '+' : '−'}${Math.abs(n).toFixed(2)}`);
     return el(
-      'section',
-      { 'aria-label': 'Morning brief' },
-      el('p', {}, `Morning brief · ${calendarDay(inbox.date, 0)} ${inbox.date.slice(0, 4)} · before 09:00`),
-      el('h2', {}, 'Overnight news'),
-      el('ul', {}, ...b.news.map((n) => el('li', {}, n.text))),
-      el('h2', {}, 'Indicative rates'),
-      el('p', {}, 'Today’s freight index: a typical cargo on each route, change since yesterday.'),
+      'div',
+      {},
       el(
         'table',
         {},
-        el('thead', {}, el('tr', {}, ...['Route', 'Cargo', 'Size', 'Rate', 'Change'].map((h) => el('th', {}, h)))),
+        el('thead', {}, el('tr', {}, ...['Route', 'Cargo', 'Size', '$/t', 'Chg'].map((h) => el('th', {}, h)))),
         el(
           'tbody',
           {},
@@ -118,33 +159,12 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
               el('td', {}, `${PORTS[r.trade.loadPort].name} to ${PORTS[r.trade.dischargePort].name}`),
               el('td', {}, formatCommodity(r.trade.commodity)),
               el('td', {}, formatClass(r.trade.vesselClass)),
-              el('td', {}, `$${r.rateUsdPerTonne.toFixed(2)}/t`),
-              el('td', {}, signed(r.changeUsdPerTonne)),
+              el('td', { class: 'num' }, `$${r.rateUsdPerTonne.toFixed(2)}`),
+              el('td', { class: `num ${r.changeUsdPerTonne > 0 ? 'up' : r.changeUsdPerTonne < 0 ? 'down' : ''}` }, signed(r.changeUsdPerTonne)),
             ),
           ),
         ),
       ),
-      el('h2', {}, 'Ship positions'),
-      el(
-        'table',
-        {},
-        el('thead', {}, el('tr', {}, ...['Ship', 'Size', 'Open', 'From'].map((h) => el('th', {}, h)))),
-        el(
-          'tbody',
-          {},
-          ...b.positions.map((ship) =>
-            el(
-              'tr',
-              {},
-              el('td', {}, ship.name),
-              el('td', {}, `${formatClass(ship.vesselClass)}, ${ship.dwt.toLocaleString('en-US')} dwt`),
-              el('td', {}, PORTS[ship.openPort].name),
-              el('td', {}, calendarDay(inbox.date, ship.openDay)),
-            ),
-          ),
-        ),
-      ),
-      el('p', {}, button('Start the day (09:00)', () => ((started = true), render()))),
     );
   }
 
@@ -159,12 +179,8 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
 
   function inboxList(): HTMLElement {
     return el(
-      'section',
-      { 'aria-label': 'Inbox' },
-      el('h2', {}, 'Inbox'),
-      el(
-        'ul',
-        {},
+      'ul',
+      { class: 'inbox' },
         ...inbox.emails.map((e) => {
           const meta = [
             deadlineLabel(e.deadlineHour),
@@ -173,17 +189,23 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
             statusOf(e),
           ].filter(Boolean);
           const label = `${read.has(e.id) ? '' : '• '}${e.from}: ${e.subject} [${meta.join(' · ')}]`;
-          return el('li', {}, button(label, () => ((openId = e.id), read.add(e.id), render()), { 'aria-current': String(openId === e.id) }));
+          return el(
+            'li',
+            {},
+            button(label, () => ((openId = e.id), read.add(e.id), render()), {
+              'aria-current': String(openId === e.id),
+              class: read.has(e.id) ? 'mail' : 'mail unread',
+            }),
+          );
         }),
-      ),
     );
   }
 
   function emailView(id: string): HTMLElement {
     const e = inbox.emails.find((x) => x.id === id)!;
     const view = el(
-      'section',
-      { 'aria-label': 'Email' },
+      'div',
+      { class: 'email' },
       el('h2', {}, e.subject),
       el('p', {}, `From: ${e.from}`),
       el(
@@ -327,9 +349,8 @@ export function renderGame(root: HTMLElement, inbox: Inbox): void {
     const cargoOf = (cargoId: string) => inbox.market.cargoes.find((c) => c.id === cargoId)!;
     const skippedEmails = s.skippedEnquiries.length + (s.distractionSkipped ? 1 : 0);
     return el(
-      'section',
-      { 'aria-label': 'End of day' },
-      el('h2', {}, 'End of day'),
+      'div',
+      {},
       ...endOfDayText(s, cargoOf).map((line) => el('p', {}, line)),
       el(
         'ul',
