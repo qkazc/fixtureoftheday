@@ -12,6 +12,9 @@ and is often around 2.5–3.75%.
 where it finished its last job to the port where it will load the next cargo.
 The owner pays for this leg but earns nothing on it.
 
+**Bid**: The rate a charterer says they will pay. Charterers bid; owners
+offer. A bid usually starts below where the charterer expects to end up.
+
 **Brokerage**: The commission a shipbroker earns for arranging a deal, usually
 paid by the shipowner as a percentage of the freight (often around 1.25% per
 broker). In this game, this is your income.
@@ -31,6 +34,10 @@ cargo owner, or a trader shipping cargo on someone else's behalf.
 **Chokepoint**: A narrow passage that many shipping routes must pass through,
 such as the Strait of Malacca, Suez Canal or Panama Canal. A closure or queue
 at one can add days or weeks to voyages.
+
+**Counter-offer (counter)**: A reply that rejects the other side's number and
+names a new one, normally closer than before. Rounds of counters narrow the
+gap until both sides meet or one walks away.
 
 **Deadweight (DWT)**: The total weight in tonnes a ship can carry: cargo plus
 fuel, fresh water, stores and crew. Because fuel and stores take up some of
@@ -75,6 +82,9 @@ after the last day the charterer can cancel.
 
 **Nautical mile (nm)**: The distance unit used at sea, equal to 1,852 metres
 (about 1.15 ordinary miles).
+
+**Offer**: The rate an owner asks for their ship. It usually starts above
+where the owner expects to settle.
 
 **Open position**: Where and when a ship becomes free for its next job,
 usually the port where it finishes discharging its current cargo. Brokers
