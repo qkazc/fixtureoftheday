@@ -48,6 +48,9 @@ npm run build:page   # build, then pack it into one HTML file:
                      # dist/fixture-of-the-day.html
 ```
 
+Every pull request and push to `main` runs the typecheck, the tests and the
+build on GitHub Actions (`.github/workflows/ci.yml`).
+
 ## Code layout
 
 - `engine/`: all game and shipping logic, in pure TypeScript with unit tests
