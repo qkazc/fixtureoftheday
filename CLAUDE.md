@@ -39,8 +39,10 @@ owner is a beginner in shipping, so teaching is part of every change.
   (`foo.ts` + `foo.test.ts`).
   - `engine/tsconfig.json` drops the DOM libs, so using `window`,
     `document`, etc. in the engine fails typechecking.
-- `src/`: UI only (Vite app). It imports from `engine/`; the engine never
-  imports from `src/`.
+- `src/`: UI only (Vite app, plain TypeScript + DOM, no framework). It
+  imports from `engine/`; the engine never imports from `src/`. Pure UI
+  logic (`state.ts`, `format.ts`) is unit-tested; DOM code (`view.ts`) stays
+  thin. The UI picks the day: today's date, or `?date=YYYY-MM-DD`.
 
 ## Conventions
 
