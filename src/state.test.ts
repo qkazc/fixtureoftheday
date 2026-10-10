@@ -14,8 +14,28 @@ import {
   voyageOutline,
 } from './state';
 
-const market = generateMarket('2026-10-10');
-// That day: C4 is Tubarão iron ore (Capesize); S3 is a Capesize open at Tubarão.
+/**
+ * Finds a day with what these tests need: a cargo with a ship already at its
+ * load port, a second ship of the same class elsewhere, and a second cargo
+ * of that class. Searching keeps the tests independent of any one day.
+ */
+function findDay() {
+  for (let i = 0; i < 365; i++) {
+    const market = generateMarket(new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10));
+    for (const cargo of market.cargoes) {
+      const atPort = market.ships.find((s) => s.vesselClass === cargo.vesselClass && s.openPort === cargo.loadPort);
+      const other = market.ships.find((s) => s.vesselClass === cargo.vesselClass && s.openPort !== cargo.loadPort);
+      const otherCargo = market.cargoes.find((c) => c !== cargo && c.vesselClass === cargo.vesselClass);
+      if (atPort && other && otherCargo) {
+        return { market, CARGO: cargo.id, AT_PORT: atPort.id, OTHER: other.id, OTHER_CARGO: otherCargo.id };
+      }
+    }
+  }
+  throw new Error('no suitable day found');
+}
+
+const { market, CARGO, AT_PORT, OTHER, OTHER_CARGO } = findDay();
+const cargoClass = market.cargoes.find((c) => c.id === CARGO)!.vesselClass;
 
 /** Plays the last call at a rate inside both hidden limits, so the deal closes. */
 function closeDeal(selections: ReturnType<typeof initialSelections>, cargoId: string) {
@@ -25,129 +45,135 @@ function closeDeal(selections: ReturnType<typeof initialSelections>, cargoId: st
   return sendProposal(s, cargoId, (n.limits.ownerFloorRate + n.limits.chartererCeilingRate) / 2);
 }
 
+/** Lowballs until the talks fail. */
+function failDeal(selections: ReturnType<typeof initialSelections>, cargoId: string) {
+  let s = selections;
+  for (let i = 0; i < MAX_ROUNDS; i++) s = sendProposal(s, cargoId, 0.05);
+  return s;
+}
+
 describe('choosing ships', () => {
   it('offers only ships of the cargo class', () => {
-    const ships = availableShips(market, initialSelections(market), 'C4');
+    const ships = availableShips(market, initialSelections(market), CARGO);
     expect(ships.length).toBeGreaterThan(0);
-    for (const s of ships) expect(s.vesselClass).toBe('capesize');
+    for (const s of ships) expect(s.vesselClass).toBe(cargoClass);
   });
 
   it('opens talks when a ship is chosen, and hides that ship from other cargoes', () => {
-    const s = chooseShip(market, initialSelections(market), 'C4', 'S3');
-    expect(s['C4']!.negotiation?.status).toBe('open');
-    expect(availableShips(market, s, 'C1').map((x) => x.id)).not.toContain('S3');
-    expect(availableShips(market, s, 'C4').map((x) => x.id)).toContain('S3');
+    const s = chooseShip(market, initialSelections(market), CARGO, AT_PORT);
+    expect(s[CARGO]!.negotiation?.status).toBe('open');
+    expect(availableShips(market, s, OTHER_CARGO).map((x) => x.id)).not.toContain(AT_PORT);
+    expect(availableShips(market, s, CARGO).map((x) => x.id)).toContain(AT_PORT);
   });
 
   it('locks the ship once a proposal has been sent', () => {
-    let s = chooseShip(market, initialSelections(market), 'C4', 'S3');
-    expect(isLocked(s['C4']!)).toBe(false);
-    s = sendProposal(s, 'C4', 1);
-    expect(isLocked(s['C4']!)).toBe(true);
-    expect(chooseShip(market, s, 'C4', 'S2')).toBe(s);
+    let s = chooseShip(market, initialSelections(market), CARGO, AT_PORT);
+    expect(isLocked(s[CARGO]!)).toBe(false);
+    s = sendProposal(s, CARGO, 0.05);
+    expect(isLocked(s[CARGO]!)).toBe(true);
+    expect(chooseShip(market, s, CARGO, OTHER)).toBe(s);
   });
 
   it('frees the ship for other cargoes if talks fail', () => {
-    let s = chooseShip(market, initialSelections(market), 'C4', 'S3');
-    for (let i = 0; i < MAX_ROUNDS; i++) s = sendProposal(s, 'C4', 0.05);
-    expect(s['C4']!.negotiation?.status).toBe('failed');
-    expect(availableShips(market, s, 'C1').map((x) => x.id)).toContain('S3');
+    const s = failDeal(chooseShip(market, initialSelections(market), CARGO, AT_PORT), CARGO);
+    expect(s[CARGO]!.negotiation?.status).toBe('failed');
+    expect(availableShips(market, s, OTHER_CARGO).map((x) => x.id)).toContain(AT_PORT);
   });
 
   it('gives the ballast distance and voyage days before any rate is agreed', () => {
-    const o = voyageOutline(market, 'S3', 'C4');
-    expect(o.ballastNm).toBe(0); // S3 is already at Tubarão
+    const o = voyageOutline(market, AT_PORT, CARGO);
+    expect(o.ballastNm).toBe(0);
     expect(o.days).toBeGreaterThan(10);
   });
 });
 
 describe('scoring', () => {
   it('scores nothing before any deal is agreed', () => {
-    const s = chooseShip(market, initialSelections(market), 'C4', 'S3');
+    const s = chooseShip(market, initialSelections(market), CARGO, AT_PORT);
     expect(toFixtures(s)).toEqual([]);
     expect(evaluate(market, s).totalScore).toBe(0);
   });
 
   it('scores an agreed deal at the agreed rate', () => {
-    const s = closeDeal(chooseShip(market, initialSelections(market), 'C4', 'S3'), 'C4');
-    expect(s['C4']!.negotiation?.status).toBe('agreed');
+    const s = closeDeal(chooseShip(market, initialSelections(market), CARGO, AT_PORT), CARGO);
+    expect(s[CARGO]!.negotiation?.status).toBe('agreed');
     const [fixture] = toFixtures(s);
-    expect(fixture).toEqual({ cargoId: 'C4', shipId: 'S3', rateUsdPerTonne: s['C4']!.negotiation!.agreedRate });
+    expect(fixture).toEqual({ cargoId: CARGO, shipId: AT_PORT, rateUsdPerTonne: s[CARGO]!.negotiation!.agreedRate });
     const e = evaluate(market, s);
-    expect(e.byCargo['C4']?.status).toBe('fixed');
+    expect(e.byCargo[CARGO]?.status).toBe('fixed');
     expect(e.totalScore).toBeGreaterThan(0);
   });
 
   it('ignores proposals for a cargo with no open talks', () => {
     const s = initialSelections(market);
-    expect(sendProposal(s, 'C4', 10)).toBe(s);
+    expect(sendProposal(s, CARGO, 10)).toBe(s);
   });
 });
 
 describe('boardCell', () => {
   it('marks wrong-class pairs as not fitting', () => {
     const s = initialSelections(market);
-    const c = market.cargoes[0]!;
-    const wrong = market.ships.find((x) => x.vesselClass !== c.vesselClass)!;
-    const cell = boardCell(market, s, wrong.id, c.id);
+    const wrong = market.ships.find((x) => x.vesselClass !== cargoClass)!;
+    const cell = boardCell(market, s, wrong.id, CARGO);
     expect(cell.fits).toBe(false);
     expect(cell.estTceUsdPerDay).toBeNull();
   });
 
   it('estimates owner TCE at the market rate, best for a ship at the load port', () => {
     const s = initialSelections(market);
-    const atPort = boardCell(market, s, 'S3', 'C4'); // S3 is at Tubarão
+    const atPort = boardCell(market, s, AT_PORT, CARGO);
     expect(atPort.ballastNm).toBe(0);
     expect(atPort.estTceRatio).toBeGreaterThan(1);
-    const far = boardCell(market, s, 'S4', 'C4'); // S4 is at Qingdao
-    expect(far.estTceUsdPerDay!).toBeLessThan(atPort.estTceUsdPerDay!);
+    const elsewhere = boardCell(market, s, OTHER, CARGO);
+    expect(elsewhere.estTceUsdPerDay!).toBeLessThan(atPort.estTceUsdPerDay!);
   });
 
   it('tracks talks: talking, busy elsewhere, fixed and failed', () => {
-    let s = chooseShip(market, initialSelections(market), 'C4', 'S3');
-    expect(boardCell(market, s, 'S3', 'C4').status).toBe('talking');
-    expect(boardCell(market, s, 'S3', 'C1').status).toBe('busy');
-    expect(boardCell(market, s, 'S2', 'C1').status).toBe('free');
-    s = closeDeal(s, 'C4');
-    expect(boardCell(market, s, 'S3', 'C4').status).toBe('fixed');
+    let s = chooseShip(market, initialSelections(market), CARGO, AT_PORT);
+    expect(boardCell(market, s, AT_PORT, CARGO).status).toBe('talking');
+    expect(boardCell(market, s, AT_PORT, OTHER_CARGO).status).toBe('busy');
+    expect(boardCell(market, s, OTHER, OTHER_CARGO).status).toBe('free');
+    s = closeDeal(s, CARGO);
+    expect(boardCell(market, s, AT_PORT, CARGO).status).toBe('fixed');
 
-    let f = chooseShip(market, initialSelections(market), 'C3', 'S4');
-    for (let i = 0; i < MAX_ROUNDS; i++) f = sendProposal(f, 'C3', 0.05);
-    expect(boardCell(market, f, 'S4', 'C3').status).toBe('failed');
-    expect(boardCell(market, f, 'S2', 'C3').status).toBe('busy'); // cargo C3 is lost for the day
+    const f = failDeal(chooseShip(market, initialSelections(market), CARGO, OTHER), CARGO);
+    expect(boardCell(market, f, OTHER, CARGO).status).toBe('failed');
+    expect(boardCell(market, f, AT_PORT, CARGO).status).toBe('busy'); // the cargo is lost for the day
   });
 });
 
 describe('firm offers and the daily budget', () => {
   it('closes a deal with a firm offer inside both limits', () => {
-    const s = chooseShip(market, initialSelections(market), 'C4', 'S3');
-    const { ownerFloorRate, chartererCeilingRate } = s['C4']!.negotiation!.limits;
-    const done = sendFirmOffer(s, 'C4', (ownerFloorRate + chartererCeilingRate) / 2);
-    expect(done['C4']!.negotiation?.status).toBe('agreed');
+    const s = chooseShip(market, initialSelections(market), CARGO, AT_PORT);
+    const { ownerFloorRate, chartererCeilingRate } = s[CARGO]!.negotiation!.limits;
+    const done = sendFirmOffer(s, CARGO, (ownerFloorRate + chartererCeilingRate) / 2);
+    expect(done[CARGO]!.negotiation?.status).toBe('agreed');
   });
 
   it('spends one unit of budget per proposal or firm offer, across cargoes', () => {
-    let s = chooseShip(market, initialSelections(market), 'C4', 'S3');
-    s = chooseShip(market, s, 'C1', 'S2');
+    let s = chooseShip(market, initialSelections(market), CARGO, AT_PORT);
+    s = chooseShip(market, s, OTHER_CARGO, OTHER);
     expect(budgetLeft(s)).toBe(PROPOSALS_PER_DAY);
-    s = sendProposal(s, 'C4', 0.05);
-    s = sendProposal(s, 'C1', 0.05);
+    s = sendProposal(s, CARGO, 0.05);
+    s = sendProposal(s, OTHER_CARGO, 0.05);
     expect(budgetLeft(s)).toBe(PROPOSALS_PER_DAY - 2);
   });
 
-  it('ignores proposals once the budget is spent', () => {
-    // Burn the budget on lowball proposals across cargoes, freeing ships as talks fail.
+  it('ignores proposals and firm offers once the budget is spent', () => {
+    // Lowball every cargo in turn until the day's budget runs out.
     let s = initialSelections(market);
-    const plays: [string, string][] = [['C4', 'S3'], ['C1', 'S2'], ['C3', 'S4']];
-    for (const [cargoId, shipId] of plays) {
-      s = chooseShip(market, s, cargoId, shipId);
-      for (let i = 0; i < MAX_ROUNDS && budgetLeft(s) > 0; i++) s = sendProposal(s, cargoId, 0.05);
+    let stuck: string | null = null;
+    for (const cargo of market.cargoes) {
+      if (budgetLeft(s) === 0) break;
+      const ship = availableShips(market, s, cargo.id)[0];
+      if (!ship) continue;
+      s = chooseShip(market, s, cargo.id, ship.id);
+      for (let i = 0; i < MAX_ROUNDS && budgetLeft(s) > 0; i++) s = sendProposal(s, cargo.id, 0.05);
+      if (s[cargo.id]!.negotiation?.status === 'open') stuck = cargo.id;
     }
-    s = chooseShip(market, s, 'C2', 'S5');
-    for (let i = 0; i < 5; i++) s = sendProposal(s, 'C2', 0.05);
     expect(budgetLeft(s)).toBe(0);
-    expect(sendProposal(s, 'C2', 10)).toBe(s);
-    expect(sendFirmOffer(s, 'C2', 10)).toBe(s);
+    expect(stuck).not.toBeNull();
+    expect(sendProposal(s, stuck!, 10)).toBe(s);
+    expect(sendFirmOffer(s, stuck!, 10)).toBe(s);
   });
 });
-

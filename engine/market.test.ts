@@ -16,6 +16,7 @@ import {
   type ShipOffer,
 } from './market';
 import { distanceNm, PORTS } from './ports';
+import { estimateVoyage } from './scoring';
 import { VESSEL_CLASSES } from './vessels';
 import { calculateVoyage } from './voyage';
 
@@ -167,6 +168,24 @@ describe('generateMarket', () => {
     });
     expect(ballasts.some((nm) => nm <= CLOSE_OPEN_NM)).toBe(true);
     expect(ballasts.some((nm) => nm > CLOSE_OPEN_NM && nm <= NEARBY_OPEN_NM)).toBe(true);
+  });
+
+  it('makes ships compete: on most days one ship is the best fit for two cargoes', () => {
+    let contested = 0;
+    for (const date of DATES) {
+      const m = generateMarket(date);
+      const bestShipFor = m.cargoes.map((c) => {
+        const ranked = m.ships
+          .filter((s) => s.vesselClass === c.vesselClass)
+          .map((s) => ({ id: s.id, tce: estimateVoyage(m, s, c, c.marketRateUsdPerTonne).tceUsdPerDay }))
+          .sort((a, b) => b.tce - a.tce);
+        return ranked[0]!.id;
+      });
+      if (new Set(bestShipFor).size < bestShipFor.length) contested++;
+    }
+    // About 3 days in 4 by design, but not every day.
+    expect(contested).toBeGreaterThanOrEqual(60);
+    expect(contested).toBeLessThan(DATES.length);
   });
 
   it('only uses trades whose ports handle the commodity', () => {

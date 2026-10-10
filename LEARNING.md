@@ -34,6 +34,11 @@ Places where the game deliberately differs from reality, and why.
 ### Daily market (`engine/market.ts`, `engine/vessels.ts`)
 - **No dates or laycans.** Every ship is ready now. Real ships open on a
   given date, and cargoes have a laycan window the ship must arrive in.
+- **A staged contest.** About 3 days in 4 include two same-size cargoes
+  loading near each other, plus one ship placed to suit both. Real markets
+  produce this naturally: ships and cargoes cluster in the same regions
+  (the Atlantic, the Pacific, the Indian Ocean), so brokers compete for the
+  same well-placed ships every day.
 - **One class per trade.** Each cargo needs exactly its trade's class. In
   reality a bigger ship can take a smaller cargo (usually at a worse rate),
   and cargo sizes are quoted with a tolerance such as "10% more or less".
@@ -88,7 +93,8 @@ figures later.
   cargo ranges, port days and costs, and market TCE (Supramax $13,000,
   Panamax $14,000, Capesize $20,000 a day). Plausible, hand-picked.
 - **Market** (`engine/market.ts`): bunkers $550–650/t, 5% commission, ±10%
-  rate noise, 2,000 nm typical ballast leg. Each cargo's matching ship opens
+  rate noise, 2,000 nm typical ballast leg, 50% chance of adding a contested
+  pair on days without one. Each cargo's matching ship opens
   within 4,000 nm of the load port (half within 1,000 nm). Hand-picked.
 - **Scoring** (`engine/scoring.ts`): ±20% satisfaction bands, tuned for
   gameplay. Brokerage of 1.25% is a common real-world figure, not sourced
@@ -126,3 +132,11 @@ Brokerage is a percentage of the freight, so a higher rate pays the broker
 more, but it also upsets the charterer, who is just as much a client. In this
 game the score multiplies commission by both clients' satisfaction, so
 squeezing either side costs you.
+
+### Ships and cargoes cluster by region
+Trades share load ports and regions: Brazil ships ore to both China and
+Europe, Richards Bay ships coal to India and Europe, Santos ships grain to
+both too. So the ships near one cargo are usually near another, and a good
+broker decides which cargo each well-placed ship should take, not just
+which ship suits each cargo.
+

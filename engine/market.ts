@@ -27,6 +27,10 @@ export const TRADES: readonly Trade[] = [
   { commodity: 'coal', loadPort: 'richardsBay', dischargePort: 'mundra', vesselClass: 'supramax' },
   { commodity: 'grain', loadPort: 'santos', dischargePort: 'qingdao', vesselClass: 'panamax' },
   { commodity: 'grain', loadPort: 'usGulf', dischargePort: 'rotterdam', vesselClass: 'supramax' },
+  { commodity: 'coal', loadPort: 'richardsBay', dischargePort: 'rotterdam', vesselClass: 'supramax' },
+  { commodity: 'grain', loadPort: 'santos', dischargePort: 'rotterdam', vesselClass: 'panamax' },
+  { commodity: 'coal', loadPort: 'newcastle', dischargePort: 'mundra', vesselClass: 'panamax' },
+  { commodity: 'grain', loadPort: 'usGulf', dischargePort: 'qingdao', vesselClass: 'panamax' },
 ];
 
 export interface CargoOrder extends Trade {
@@ -67,6 +71,8 @@ export const TYPICAL_BALLAST_NM = 2_000;
 export const NEARBY_OPEN_NM = 4_000;
 /** Within this distance a matching ship counts as "close" rather than "medium". */
 export const CLOSE_OPEN_NM = 1_000;
+/** Chance of adding a contested pair on a day that lacks one (about 3 days in 4 end up contested). PLACEHOLDER: tuned for play. */
+export const CONTEST_CHANCE = 0.5;
 const RATE_NOISE = 0.1; // market rates vary up to ±10% around the target
 const SHIP_NAMES = [
   'Amber Tern', 'Blue Heron', 'Cape Lark', 'Coral Wren', 'Golden Kite', 'Iron Gull',
@@ -80,20 +86,26 @@ export function generateMarket(date: string): DailyMarket {
   const rng = createRng(hashSeed(date));
   const bunkerPriceUsdPerTonne = randomInt(rng, 110, 130) * 5; // $550–650
 
-  const cargoes = shuffle(rng, TRADES)
-    .slice(0, CARGOES_PER_DAY)
-    .map((trade, i) => makeCargo(rng, trade, `C${i + 1}`, bunkerPriceUsdPerTonne));
+  const cargoes = drawTrades(rng).map((trade, i) =>
+    makeCargo(rng, trade, `C${i + 1}`, bunkerPriceUsdPerTonne),
+  );
 
   // One ship per cargo, of the right class and open within NEARBY_OPEN_NM of
-  // its load port, so every day has a sensible match. Plus one spare ship,
-  // open anywhere, as a decoy. Shuffled so the order gives nothing away.
+  // its load port, so every day has a sensible match. Plus one shared ship
+  // that two cargoes compete for (see sharedShip). Shuffled so the order
+  // gives nothing away.
+  const contest = pickContest(rng, cargoes);
   const placements: { vesselClass: VesselClass; openPort: PortId; forCargo?: CargoOrder }[] = [
     ...cargoes.map((c) => ({
       vesselClass: c.vesselClass,
-      openPort: nearbyPort(rng, c.loadPort),
+      // The two contested cargoes get their own ship at medium distance, so
+      // the shared ship is the stronger candidate for both.
+      openPort: contest?.cargoes.includes(c)
+        ? fartherPort(rng, c.loadPort, contest)
+        : nearbyPort(rng, c.loadPort),
       forCargo: c,
     })),
-    { vesselClass: pick(rng, VESSEL_CLASS_IDS), openPort: pick(rng, PORT_IDS) },
+    contest?.ship ?? { vesselClass: pick(rng, VESSEL_CLASS_IDS), openPort: pick(rng, PORT_IDS) },
   ];
   const names = shuffle(rng, SHIP_NAMES);
   const placed = shuffle(rng, placements).map((p, i) => ({
@@ -166,6 +178,70 @@ export function negotiationLimits(
 export function hasDealZone(market: DailyMarket, ship: ShipOffer, cargo: CargoOrder): boolean {
   const l = negotiationLimits(market, ship, cargo);
   return l.ownerFloorRate <= l.chartererCeilingRate;
+}
+
+/** Two trades a single ship could reasonably serve: same class, load ports close together. */
+const isClosePair = (a: Trade, b: Trade) =>
+  a.vesselClass === b.vesselClass && distanceNm(a.loadPort, b.loadPort) <= NEARBY_OPEN_NM;
+
+const CLOSE_PAIRS = TRADES.flatMap((a, i) =>
+  TRADES.slice(i + 1).filter((b) => isClosePair(a, b)).map((b) => [a, b] as const),
+);
+
+/**
+ * The day's trades. Most days (CONTEST_CHANCE) include a close pair, so
+ * that two cargoes compete for one well-placed ship.
+ */
+function drawTrades(rng: Rng): Trade[] {
+  let trades = shuffle(rng, TRADES).slice(0, CARGOES_PER_DAY);
+  const hasPair = trades.some((a, i) => trades.slice(i + 1).some((b) => isClosePair(a, b)));
+  if (!hasPair && rng() < CONTEST_CHANCE) {
+    const [a, b] = pick(rng, CLOSE_PAIRS);
+    const rest = shuffle(rng, TRADES.filter((t) => t !== a && t !== b)).slice(0, CARGOES_PER_DAY - 2);
+    trades = shuffle(rng, [a, b, ...rest]);
+  }
+  return trades;
+}
+
+/**
+ * The day's contest: two cargoes of the same class loading within
+ * NEARBY_OPEN_NM of each other, and one extra ship of that class open at the
+ * port closest to both load ports, so the player must decide which cargo
+ * gets it. Null if no such pair exists that day.
+ */
+function pickContest(
+  rng: Rng,
+  cargoes: readonly CargoOrder[],
+): { cargoes: readonly CargoOrder[]; ship: { vesselClass: VesselClass; openPort: PortId } } | null {
+  const pairs = cargoes.flatMap((a, i) =>
+    cargoes.slice(i + 1).filter((b) => isClosePair(a, b)).map((b) => [a, b] as const),
+  );
+  if (pairs.length === 0) return null;
+  const [a, b] = pick(rng, pairs);
+  const reach = (p: PortId) => Math.max(distanceNm(p, a.loadPort), distanceNm(p, b.loadPort));
+  const openPort = PORT_IDS.reduce((best, p) => (reach(p) < reach(best) ? p : best));
+  return { cargoes: [a, b], ship: { vesselClass: a.vesselClass, openPort } };
+}
+
+/**
+ * For a contested cargo's own ship: a port within NEARBY_OPEN_NM of its load
+ * port, but farther than the shared ship from both contested load ports, so
+ * the shared ship stays the better option for each. Falls back to any nearby
+ * port if there is none.
+ */
+function fartherPort(
+  rng: Rng,
+  loadPort: PortId,
+  contest: { cargoes: readonly CargoOrder[]; ship: { openPort: PortId } },
+): PortId {
+  const options = PORT_IDS.filter(
+    (p) =>
+      distanceNm(p, loadPort) <= NEARBY_OPEN_NM &&
+      contest.cargoes.every(
+        (c) => distanceNm(p, c.loadPort) > distanceNm(contest.ship.openPort, c.loadPort),
+      ),
+  );
+  return options.length > 0 ? pick(rng, options) : nearbyPort(rng, loadPort);
 }
 
 /** A port near the load port: half the time close, half the time medium distance. */
