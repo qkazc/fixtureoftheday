@@ -22,6 +22,10 @@ owner is a beginner in shipping, so teaching is part of every change.
 - **Flag simplifications.** Say clearly where the model simplifies reality.
   Record them in code comments next to the logic, and note the bigger ones in
   `LEARNING.md`.
+- **Simple over precise.** This is a hypothetical game. Prefer simple,
+  plausible, clearly-labelled numbers over precision (e.g. a hand-written
+  distance table, not a routing model). Keep modules small.
+- **Ask before adding any dependency or dataset**, including dev-only ones.
 - **Label placeholder numbers.** If a number is a made-up or rough value
   rather than a sourced real-world figure, say so, and mark it in code with a
   `// PLACEHOLDER:` comment. Real figures should note their source or basis.
@@ -35,8 +39,13 @@ owner is a beginner in shipping, so teaching is part of every change.
   (`foo.ts` + `foo.test.ts`).
   - `engine/tsconfig.json` drops the DOM libs, so using `window`,
     `document`, etc. in the engine fails typechecking.
-- `src/`: UI only (Vite app). It imports from `engine/`; the engine never
-  imports from `src/`.
+- `src/`: UI only (Vite app, plain TypeScript + DOM, no framework). It
+  imports from `engine/`; the engine never imports from `src/`. Pure UI
+  logic (`text.ts`, `format.ts`) is unit-tested; DOM code (`view.ts`) stays
+  thin. The UI picks the day: today's date, `?date=YYYY-MM-DD`, or
+  `#YYYY-MM-DD` (the form the published page can read).
+- The daily loop: `engine/inbox.ts` turns a day's market into emails;
+  `engine/day.ts` is the pure state machine for the 09:00-17:00 day.
 
 ## Conventions
 
@@ -53,11 +62,14 @@ owner is a beginner in shipping, so teaching is part of every change.
 - `npm run test:watch`: tests in watch mode
 - `npm run typecheck`: typecheck the app and, separately, the engine (no DOM)
 - `npm run build`: typecheck and production build
+- `npm run build:page`: build, then pack into one self-contained HTML file
+  (`dist/fixture-of-the-day.html`), the file that gets published as a page
 
 Run `npm run typecheck && npm test` before every commit.
 
 ## Docs
 
+- `README.md`: what the game is, how to run it, and the code layout.
 - `GLOSSARY.md`: shipping terms in plain English.
 - `LEARNING.md`: running log of what we've learned about the industry,
   simplifications we've chosen, and placeholder numbers to revisit.

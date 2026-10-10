@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p engine",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:page": "npm run build && node scripts/build-page.mjs"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
