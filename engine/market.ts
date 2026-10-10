@@ -61,6 +61,8 @@ export interface ShipOffer {
 
 export interface DailyMarket {
   date: string;
+  /** The text all of the day's randomness comes from (see puzzleSeed). */
+  seed: string;
   bunkerPriceUsdPerTonne: number;
   cargoes: CargoOrder[];
   ships: ShipOffer[];
@@ -88,18 +90,41 @@ export const TYPICAL_BALLAST_NM = 2_000;
 export const NEARBY_OPEN_NM = 4_000;
 /** Within this distance a matching ship counts as "close" rather than "medium". */
 export const CLOSE_OPEN_NM = 1_000;
+/**
+ * Version of the puzzle generator. Bump it whenever a change alters the days
+ * it generates: it is part of every seed, and saved days from another
+ * version are discarded instead of replaying against a different puzzle.
+ */
+export const GENERATOR_VERSION = 1;
+
+/**
+ * The seed for a date's puzzle. `variant` lets the daily picker re-roll a
+ * day that came out dull (see engine/daily.ts); 0 is the first try.
+ */
+export const puzzleSeed = (date: string, variant = 0): string => `v${GENERATOR_VERSION}|${date}|${variant}`;
+
+/**
+ * The day's bunker price ($550–650). Seeded by the date alone, so it is a
+ * fact of the day that doesn't change with the variant or version, and the
+ * brief can compare it with yesterday's.
+ */
+export function bunkerPrice(date: string): number {
+  return randomInt(createRng(hashSeed(`${date}|bunkers`)), 110, 130) * 5;
+}
+
 const RATE_NOISE = 0.1; // market rates vary up to ±10% around the target
 const SHIP_NAMES = [
   'Amber Tern', 'Blue Heron', 'Cape Lark', 'Coral Wren', 'Golden Kite', 'Iron Gull',
   'Jade Petrel', 'Northern Swift', 'Ocean Plover', 'Silver Crane', 'Storm Egret', 'Sun Falcon',
 ];
 
-export function generateMarket(date: string): DailyMarket {
+export function generateMarket(date: string, variant = 0): DailyMarket {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new RangeError(`date must look like YYYY-MM-DD, got ${date}`);
   }
-  const rng = createRng(hashSeed(date));
-  const bunkerPriceUsdPerTonne = randomInt(rng, 110, 130) * 5; // $550–650
+  const seed = puzzleSeed(date, variant);
+  const rng = createRng(hashSeed(seed));
+  const bunkerPriceUsdPerTonne = bunkerPrice(date);
 
   const cargoCount = randomInt(rng, CARGOES_PER_DAY_RANGE[0], CARGOES_PER_DAY_RANGE[1]);
   const cargoes = drawTrades(rng, cargoCount).map((trade, i) =>
@@ -141,7 +166,7 @@ export function generateMarket(date: string): DailyMarket {
     },
     forCargoes: p.forCargoes,
   }));
-  const market: DailyMarket = { date, bunkerPriceUsdPerTonne, cargoes, ships: placed.map((p) => p.ship) };
+  const market: DailyMarket = { date, seed, bunkerPriceUsdPerTonne, cargoes, ships: placed.map((p) => p.ship) };
 
   // Clients' hidden limits can leave a cargo with no ship it could be fixed
   // with. If so, move its own ship to the load port (which only makes it
@@ -213,11 +238,11 @@ export function seededShare(text: string, [min, max]: readonly [number, number])
 
 /** A ship owner's hidden floor, as a share of the class market TCE. Lower means keener to fix. */
 export const ownerFloorShare = (market: DailyMarket, ship: ShipOffer): number =>
-  seededShare(`${market.date}|owner|${ship.id}`, OWNER_FLOOR_RANGE);
+  seededShare(`${market.seed}|owner|${ship.id}`, OWNER_FLOOR_RANGE);
 
 /** A charterer's hidden ceiling, as a share of the market rate. Higher means more willing to pay. */
 export const chartererCeilingShare = (market: DailyMarket, cargo: CargoOrder): number =>
-  seededShare(`${market.date}|charterer|${cargo.id}`, CHARTERER_CEILING_RANGE);
+  seededShare(`${market.seed}|charterer|${cargo.id}`, CHARTERER_CEILING_RANGE);
 
 /**
  * Each owner's floor and each charterer's ceiling for one ship-cargo pair.

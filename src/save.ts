@@ -5,9 +5,12 @@
 // same day. A save that no longer replays cleanly (e.g. after a game update)
 // is discarded and the day starts fresh. Storage can be missing or throw
 // (private windows, blocked site data), so every access is guarded and the
-// game works without it.
+// game works without it. Each save records the puzzle generator's version:
+// after an update that changes the puzzles, an old save is discarded rather
+// than replayed against a different day.
 
 import {
+  GENERATOR_VERSION,
   attemptFix,
   endDay,
   handleDistraction,
@@ -28,6 +31,8 @@ export type SavedAction =
 
 export interface SavedDay {
   version: 1;
+  /** The GENERATOR_VERSION the day was played on. */
+  generator: number;
   date: string;
   started: boolean;
   read: string[];
@@ -101,7 +106,7 @@ export function loadDay(store: StorageLike | null, inbox: Inbox): LoadedDay | nu
     const raw = store.getItem(storageKey(inbox.date));
     if (!raw) return null;
     const saved = JSON.parse(raw) as Partial<SavedDay>;
-    if (saved.version !== 1 || saved.date !== inbox.date || !Array.isArray(saved.actions)) return null;
+    if (saved.version !== 1 || saved.generator !== GENERATOR_VERSION || saved.date !== inbox.date || !Array.isArray(saved.actions)) return null;
     const day = replay(inbox, saved.actions);
     if (!day) return null;
     return {
@@ -115,10 +120,10 @@ export function loadDay(store: StorageLike | null, inbox: Inbox): LoadedDay | nu
   }
 }
 
-export function saveDay(store: StorageLike | null, saved: Omit<SavedDay, 'version'>): void {
+export function saveDay(store: StorageLike | null, saved: Omit<SavedDay, 'version' | 'generator'>): void {
   if (!store) return;
   try {
-    store.setItem(storageKey(saved.date), JSON.stringify({ version: 1, ...saved }));
+    store.setItem(storageKey(saved.date), JSON.stringify({ version: 1, generator: GENERATOR_VERSION, ...saved }));
   } catch {
     // Storage full or blocked: the game carries on unsaved.
   }

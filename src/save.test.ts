@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { generateInbox, isWorkable, negotiationLimits, startDay, type EnquiryEmail } from '../engine';
+import { GENERATOR_VERSION, generateInbox, isWorkable, negotiationLimits, startDay, type EnquiryEmail } from '../engine';
 import { applyAction, loadDay, replay, saveDay, storageKey, type SavedAction, type StorageLike } from './save';
 
 const inbox = generateInbox('2026-10-10');
 const enquiries = inbox.emails.filter((e): e is EnquiryEmail => e.kind === 'enquiry');
-const e = enquiries[0]!;
+// The enquiry with the most spare time, so research and two fix attempts fit before its deadline.
+const e = [...enquiries].sort((a, b) => (b.deadlineHour! - 2 * b.effortHours) - (a.deadlineHour! - 2 * a.effortHours))[0]!;
 const cargo = inbox.market.cargoes.find((c) => c.id === e.cargoId)!;
 const ship = inbox.market.ships.find((s) => isWorkable(inbox.market, s, cargo))!;
 const l = negotiationLimits(inbox.market, ship, cargo);
@@ -63,7 +64,16 @@ describe('saveDay and loadDay', () => {
     expect(loadDay(store, inbox)).toBeNull();
     store.setItem(storageKey(inbox.date), JSON.stringify({ version: 2, date: inbox.date, actions: [] }));
     expect(loadDay(store, inbox)).toBeNull();
-    store.setItem(storageKey(inbox.date), JSON.stringify({ version: 1, date: inbox.date, started: true, read: [], actions: [{ kind: 'research', emailId: 'E99' }] }));
+    store.setItem(storageKey(inbox.date), JSON.stringify({ version: 1, generator: GENERATOR_VERSION, date: inbox.date, started: true, read: [], actions: [{ kind: 'research', emailId: 'E99' }] }));
+    expect(loadDay(store, inbox)).toBeNull();
+  });
+
+  it('discards a day saved on another version of the puzzle generator', () => {
+    const store = memoryStore();
+    saveDay(store, { date: inbox.date, started: true, read: [], actions });
+    expect(loadDay(store, inbox)).not.toBeNull();
+    const saved = JSON.parse(store.getItem(storageKey(inbox.date))!);
+    store.setItem(storageKey(inbox.date), JSON.stringify({ ...saved, generator: GENERATOR_VERSION - 1 }));
     expect(loadDay(store, inbox)).toBeNull();
   });
 
